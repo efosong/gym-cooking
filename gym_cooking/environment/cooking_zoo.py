@@ -61,6 +61,7 @@ class CookingEnvironment(AECEnv):
         self.filename = ""
         self.set_filename()
         self.world = CookingWorld()
+        self.seed()
         self.recipes = recipes
         self.game = None
         self.recipe_graphs = [RECIPES[recipe]() for recipe in recipes]
@@ -95,14 +96,17 @@ class CookingEnvironment(AECEnv):
                                                                            self.graph_representation_length))
                                                                  for _ in self.agents]))
 
+    def seed(self, seed=None):
+        return self.world.seed(seed)
     def set_filename(self):
         self.filename = f"{self.level}_agents{self.num_agents}"
 
     def state(self):
         pass
 
-    def reset(self):
+    def reset(self, seed=None):
         self.world = CookingWorld()
+        self.seed(seed)
         self.t = 0
 
         # For tracking data during an episode.

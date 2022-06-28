@@ -1,5 +1,6 @@
 from collections import defaultdict
 from gym_cooking.cooking_world.world_objects import *
+from gym.utils import seeding
 
 from pathlib import Path
 import os.path
@@ -25,12 +26,17 @@ class CookingWorld:
 
     # AGENT_ACTIONS: 0: Noop, 1: Left, 2: right, 3: down, 4: up, 5: interact
 
-    def __init__(self):
+    def __init__(self, seed=0):
         self.agents = []
         self.width = 0
         self.height = 0
         self.world_objects = defaultdict(list)
         self.abstract_index = defaultdict(list)
+        self.seed(seed)
+
+    def seed(self, seed=None):
+        self.np_random, seed = seeding.np_random(seed)
+        return [seed]
 
     def add_object(self, obj):
         self.world_objects[type(obj).__name__].append(obj)
@@ -224,8 +230,8 @@ class CookingWorld:
             for idx in range(static_object[name]["COUNT"]):
                 time_out = 0
                 while True:
-                    x = random.sample(static_object[name]["X_POSITION"], 1)[0]
-                    y = random.sample(static_object[name]["Y_POSITION"], 1)[0]
+                    x = self.np_random.choice(static_object[name]["X_POSITION"])
+                    y = self.np_random.choice(static_object[name]["Y_POSITION"])
                     if x < 0 or y < 0 or x > self.width or y > self.height:
                         raise ValueError(f"Position {x} {y} of object {name} is out of bounds set by the level layout!")
                     static_objects_loc = self.get_objects_at((x, y), StaticObject)
@@ -252,8 +258,8 @@ class CookingWorld:
             for idx in range(dynamic_object[name]["COUNT"]):
                 time_out = 0
                 while True:
-                    x = random.sample(dynamic_object[name]["X_POSITION"], 1)[0]
-                    y = random.sample(dynamic_object[name]["Y_POSITION"], 1)[0]
+                    x = self.np_random.choice(dynamic_object[name]["X_POSITION"])
+                    y = self.np_random.choice(dynamic_object[name]["Y_POSITION"])
                     if x < 0 or y < 0 or x > self.width or y > self.height:
                         raise ValueError(f"Position {x} {y} of object {name} is out of bounds set by the level layout!")
                     static_objects_loc = self.get_objects_at((x, y), Counter)
@@ -280,8 +286,8 @@ class CookingWorld:
                     return
                 time_out = 0
                 while True:
-                    x = random.sample(agent_object["X_POSITION"], 1)[0]
-                    y = random.sample(agent_object["Y_POSITION"], 1)[0]
+                    x = self.np_random.choice(agent_object["X_POSITION"])
+                    y = self.np_random.choice(agent_object["Y_POSITION"])
                     if x < 0 or y < 0 or x > self.width or y > self.height:
                         raise ValueError(f"Position {x} {y} of agent is out of bounds set by the level layout!")
                     static_objects_loc = self.get_objects_at((x, y), Floor)
