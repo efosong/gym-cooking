@@ -1,5 +1,6 @@
 # Other core modules
 import copy
+import functools
 
 from gym_cooking.cooking_world.cooking_world import CookingWorld
 from gym_cooking.cooking_world.world_objects import *
@@ -13,6 +14,7 @@ from pettingzoo.utils import wrappers
 from pettingzoo.utils.conversions import parallel_wrapper_fn
 
 import gym
+from gym.spaces import Discrete, Box, MultiBinary, Dict
 
 
 CollisionRepr = namedtuple("CollisionRepr", "time agent_names agent_locations")
@@ -45,8 +47,8 @@ class CookingEnvironment(AECEnv):
     def __init__(self, level, num_agents, record, max_steps, recipes, obs_spaces=["numeric"], allowed_objects=None):
         super().__init__()
 
-        self.allowed_obs_spaces = ["symbolic", "numeric"]
-        assert len(set(obs_spaces + self.allowed_obs_spaces)) == 2, \
+        self.allowed_obs_spaces = ["symbolic", "numeric", "simple"]
+        assert len(set(obs_spaces + self.allowed_obs_spaces)) == 3, \
             f"Selected invalid obs spaces. Allowed {self.allowed_obs_spaces}"
         assert len(obs_spaces) != 0, f"Please select an observation space from: {self.allowed_obs_spaces}"
         self.obs_spaces = obs_spaces
@@ -69,15 +71,6 @@ class CookingEnvironment(AECEnv):
         self.termination_info = ""
         self.world.load_level(level=self.level, num_agents=num_agents)
         self.graph_representation_length = sum([tup[1] for tup in GAME_CLASSES_STATE_LENGTH]) + self.num_agents
-
-        numeric_obs_space = {'symbolic_observation': gym.spaces.Box(low=0, high=10,
-                                                            shape=(self.world.width, self.world.height,
-                                                                   self.graph_representation_length), dtype=np.int32),
-                             'agent_location': gym.spaces.Box(low=0, high=max(self.world.width, self.world.height),
-                                                              shape=(2,)),
-                             'goal_vector': gym.spaces.MultiBinary(NUM_GOALS)}
-        self.observation_spaces = {agent: gym.spaces.Dict(numeric_obs_space) for agent in self.possible_agents}
-        self.action_spaces = {agent: gym.spaces.Discrete(6) for agent in self.possible_agents}
         self.has_reset = True
 
         self.recipe_mapping = dict(zip(self.possible_agents, self.recipe_graphs))
@@ -98,6 +91,60 @@ class CookingEnvironment(AECEnv):
 
     def seed(self, seed=None):
         return self.world.seed(seed)
+
+    @functools.lru_cache(maxsize=None)
+    def observation_space(self, agent):
+        numeric_obs_space = {
+            'symbolic_observation': Box(low=0,
+                                        high=10,
+                                        shape=(self.world.width, 
+                                               self.world.height,
+                                               self.graph_representation_length),
+                                        dtype=np.int32
+                                        ),
+             'agent_location': Box(low=0,
+                                   high=max(self.world.width, 
+                                            self.world.height),
+                                    shape=(2,)
+                                    ),
+             'goal_vector': MultiBinary(NUM_GOALS)
+             }
+        # TODO I don't really understand what the old code (above) was doing (in what sense is this
+        # the observation space of functions returned by the 'observe' function?)
+        # Simple obs space
+        simple_high = np.array([
+            self.world.width, self.world.height, # cut_board_loc,
+            self.world.width, self.world.height, # deliver_square_loc,
+            self.world.width, self.world.height, # plate_loc,
+            self.world.width, self.world.height, # tomato_loc,
+            self.world.width, self.world.height, # chopped_tomato_loc,
+            *[self.world.width, self.world.height, 1, 1, 1, 1] * len(self.possible_agents)
+            ])
+        simple_obs_space = Box(
+            low=-1,
+            high=simple_high,
+            shape=(10+6*len(self.possible_agents),)
+            )
+        if self.obs_spaces[0] == "simple":
+            return simple_obs_space
+        else:
+            return Dict(numeric_obs_space)
+
+    @property
+    def observation_spaces(self):
+        return {agent: self.observation_space(agent)
+                for agent in self.possible_agents}
+
+
+    @functools.lru_cache(maxsize=None)
+    def action_space(self, agent):
+        return gym.spaces.Discrete(6)
+
+    @property
+    def action_spaces(self):
+        return {agent: self.action_space(agent)
+                for agent in self.possible_agents}
+
     def set_filename(self):
         self.filename = f"{self.level}_agents{self.num_agents}"
 
@@ -139,9 +186,8 @@ class CookingEnvironment(AECEnv):
         self.world_agent_mapping = dict(zip(self.possible_agents, self.world.agents))
         self.world_agent_to_env_agent_mapping = dict(zip(self.world.agents, self.possible_agents))
 
-        self.current_tensor_observation = dict(zip(self.agents, [np.zeros((self.world.width, self.world.height,
-                                                                           self.graph_representation_length))
-                                                                 for _ in self.agents]))
+        self.current_tensor_observation = {agent: self.get_tensor_representation(agent)
+                                           for agent in self.agents}
         self.rewards = dict(zip(self.agents, [0 for _ in self.agents]))
         self._cumulative_rewards = dict(zip(self.agents, [0 for _ in self.agents]))
         self.dones = dict(zip(self.agents, [False for _ in self.agents]))
@@ -201,6 +247,9 @@ class CookingEnvironment(AECEnv):
             objects["Agent"] = self.world.agents
             sym_observation = copy.deepcopy(objects)
             observation.append(sym_observation)
+        if "simple" in self.obs_spaces:
+            simple_observation = self.get_simple_representation(agent)
+            observation.append(simple_observation)
         returned_observation = observation if not len(observation) == 1 else observation[0]
         return returned_observation
 
@@ -228,6 +277,48 @@ class CookingEnvironment(AECEnv):
             done = True
         return done, rewards, open_goals
 
+    def get_simple_representation(self, agent):
+        # NB: only works when there's one of each object!
+        # cutting board location
+        cut_board_loc = self.world.world_objects["CutBoard"][0].location
+        # deliver square location
+        deliver_square_loc = self.world.world_objects["DeliverSquare"][0].location
+        # plate location
+        plate_loc = self.world.world_objects["Plate"][0].location
+        # tomato location
+        tomato = self.world.world_objects["Tomato"][0]
+        if tomato.chop_state == ChopFoodStates.CHOPPED:
+            tomato_loc = (-1, -1)
+            chopped_tomato_loc =  tomato.location
+        else:
+            tomato_loc =  tomato.location
+            chopped_tomato_loc = (-1, -1)
+        # agent locations
+        ego_agent = self.world_agent_mapping[agent]
+        other_agents = [agent_obj
+                        for agent_id, agent_obj in self.world_agent_mapping.items()
+                        if agent_id != agent]
+        ego_agent_location = ego_agent.location
+        ego_agent_orientation = np.zeros(4)
+        ego_agent_orientation[ego_agent.orientation-1] = 1
+        other_agent_info = []
+        for other_agent in other_agents:
+            other_agent_location = other_agent.location
+            other_agent_orientation = np.zeros(4)
+            other_agent_orientation[other_agent.orientation-1] = 1
+            other_agent_info.extend((other_agent_location, other_agent_orientation))
+        return np.concatenate([
+            cut_board_loc,
+            deliver_square_loc,
+            plate_loc,
+            tomato_loc,
+            chopped_tomato_loc,
+            ego_agent_location,
+            ego_agent_orientation,
+            *other_agent_info
+            ])
+
+
     def get_tensor_representation(self, agent):
         tensor = np.zeros(
             (self.world.width, self.world.height, self.graph_representation_length + len(self.world.agents)))
@@ -241,7 +332,15 @@ class CookingEnvironment(AECEnv):
             if stateful_class:
                 n = 1
                 for obj in objects[ClassToString[game_class]]:
-                    representation = self.handle_stateful_class_representation(obj, stateful_class)
+                    # TODO carrot temp hack
+                    if game_class is Carrot:
+                        representation = [
+                            int(obj.chop_state != ChopFoodStates.CHOPPED),
+                            int(obj.chop_state == ChopFoodStates.CHOPPED),
+                            obj.current_progress
+                            ]
+                    else:
+                        representation = self.handle_stateful_class_representation(obj, stateful_class)
                     n = len(representation)
                     x, y = obj.location
                     for i in range(n):
@@ -252,7 +351,6 @@ class CookingEnvironment(AECEnv):
                     x, y = obj.location
                     tensor[x, y, idx] += 1
                 idx += 1
-
         ego_agent = self.world_agent_mapping[agent]
         x, y = ego_agent.location
         # location map for all agents, location maps for separate agent and four orientation maps shared
@@ -288,8 +386,12 @@ class CookingEnvironment(AECEnv):
 
     @staticmethod
     def handle_stateful_class_representation(obj, stateful_class):
+        # TODO carrot is both, so really this logic isn't great.
         if stateful_class is ChopFood:
-            return [int(obj.chop_state == ChopFoodStates.CHOPPED)]
+            return [
+                int(obj.chop_state != ChopFoodStates.CHOPPED),
+                int(obj.chop_state == ChopFoodStates.CHOPPED)
+                ]
         if stateful_class is BlenderFood:
             return [obj.current_progress]
         raise ValueError(f"Could not process stateful class {stateful_class}")
