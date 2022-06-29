@@ -163,7 +163,7 @@ class CookingEnvironment(AECEnv):
         self.termination_info = ""
 
         # Load world & distances.
-        self.world.load_level(level=self.level, num_agents=self.num_agents)
+        self.world.load_level(level=self.level, num_agents=len(self.possible_agents))
 
         for recipe in self.recipe_graphs:
             recipe.update_recipe_state(self.world)
@@ -202,6 +202,8 @@ class CookingEnvironment(AECEnv):
 
     def step(self, action):
         agent = self.agent_selection
+        if self.dones[agent]:
+            return self._was_done_step(action)
         self.accumulated_actions.append(action)
         for idx, agent in enumerate(self.agents):
             self.rewards[agent] = 0
