@@ -42,7 +42,10 @@ parallel_env = parallel_wrapper_fn(env)
 class CookingEnvironment(AECEnv):
     """Environment object for Overcooked."""
 
-    metadata = {'render.modes': ['human'], 'name': "cooking_zoo"}
+    metadata = {
+        "render_modes": ["human"],
+        "name": "cooking_zoo",
+        "is_parallelizable": True}
 
     def __init__(self, level, num_agents, record, max_steps, recipes, obs_spaces=["numeric"], allowed_objects=None):
         super().__init__()
@@ -151,7 +154,7 @@ class CookingEnvironment(AECEnv):
     def state(self):
         pass
 
-    def reset(self, seed=None):
+    def reset(self, seed=None, return_info=False, options=None):
         self.world = CookingWorld()
         self.seed(seed)
         self.t = 0
