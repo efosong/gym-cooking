@@ -21,7 +21,14 @@ CollisionRepr = namedtuple("CollisionRepr", "time agent_names agent_locations")
 COLORS = ['blue', 'magenta', 'yellow', 'green']
 
 
-def env(level, num_agents, record, max_steps, recipes, obs_spaces):
+def env(
+    level,
+    num_agents,
+    record,
+    max_steps,
+    recipes,
+    obs_spaces,
+    completion_reward_frac=0.2):
     """
     The env function wraps the environment in 3 wrappers by default. These
     wrappers contain logic that is common to many pettingzoo environments.
@@ -29,7 +36,15 @@ def env(level, num_agents, record, max_steps, recipes, obs_spaces):
     to provide sane error messages. You can find full documentation for these methods
     elsewhere in the developer documentation.
     """
-    env_init = CookingEnvironment(level, num_agents, record, max_steps, recipes, obs_spaces)
+    env_init = CookingEnvironment(
+        level=level,
+        num_agents=num_agents,
+        record=record,
+        max_steps=max_steps,
+        recipes=recipes,
+        obs_spaces=obs_spaces,
+        completion_reward_frac=completion_reward_frac,
+        )
     env_init = wrappers.CaptureStdoutWrapper(env_init)
     env_init = wrappers.AssertOutOfBoundsWrapper(env_init)
     env_init = wrappers.OrderEnforcingWrapper(env_init)
@@ -47,7 +62,17 @@ class CookingEnvironment(AECEnv):
         "name": "cooking_zoo",
         "is_parallelizable": True}
 
-    def __init__(self, level, num_agents, record, max_steps, recipes, obs_spaces=["numeric"], allowed_objects=None):
+    def __init__(
+            self,
+            level,
+            num_agents,
+            record,
+            max_steps,
+            recipes,
+            obs_spaces=["numeric"],
+            allowed_objects=None,
+            completion_reward_frac=0.2,
+        ):
         super().__init__()
 
         self.allowed_obs_spaces = ["symbolic", "numeric", "simple"]
@@ -70,6 +95,7 @@ class CookingEnvironment(AECEnv):
         self.recipes = recipes
         self.game = None
         self.recipe_graphs = [RECIPES[recipe]() for recipe in recipes]
+        self.completion_reward_frac = completion_reward_frac
 
         self.termination_info = ""
         self.world.load_level(level=self.level, num_agents=num_agents)
@@ -271,8 +297,10 @@ class CookingEnvironment(AECEnv):
             goals_before = recipe.goals_completed(NUM_GOALS)
             recipe.update_recipe_state(self.world)
             open_goals[idx] = recipe.goals_completed(NUM_GOALS)
-            bonus = recipe.completed() * 0.1
-            rewards[idx] = (sum(goals_before) - sum(open_goals[idx]) + bonus) * 10
+            n_completed_goals = sum(goals_before) - sum(open_goals[idx])
+            rewards[idx] = ((1-self.completion_reward_frac)*n_completed_goals/len(recipe.node_list)
+                            + self.completion_reward_frac*recipe.completed())
+
             if rewards[idx] < 0:
                 print(f"Goals before: {goals_before}")
                 print(f"Goals after: {open_goals}")
