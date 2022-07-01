@@ -7,11 +7,11 @@ num_humans = 1
 max_steps = 100
 render = False
 
-level = 'split_room'
+level = 'split_room_onesided'
 seed = 1
 record = False
 max_num_timesteps = 1000
-recipes = ["TomatoLettuceOnionSalad", 'TomatoLettuceOnionSalad']
+recipes = ["TomatoSalad", 'TomatoSalad']
 
 parallel_env = cooking_zoo.parallel_env(
     level=level,
@@ -19,7 +19,8 @@ parallel_env = cooking_zoo.parallel_env(
     record=record,
     max_steps=max_num_timesteps,
     recipes=recipes,
-    obs_spaces=["simple"]
+    obs_spaces=["simple"],
+    completion_reward_frac=0.5,
     )
 
 action_spaces = parallel_env.action_spaces
