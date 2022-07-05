@@ -2,6 +2,7 @@ import copy
 from collections import defaultdict
 from gym_cooking.cooking_world.world_objects import *
 from gym_cooking.cooking_world.actions import *
+from gym_cooking.cooking_world.cooking_action_util import action_scheme1, action_scheme2, action_scheme3
 
 from pathlib import Path
 import os.path
@@ -19,7 +20,7 @@ class CookingWorld:
 
     agent_turn_map = {(LEFT, ActionScheme2.TURN_LEFT): DOWN, (RIGHT, ActionScheme2.TURN_LEFT): UP,
                       (UP, ActionScheme2.TURN_LEFT): LEFT, (DOWN, ActionScheme2.TURN_LEFT): RIGHT,
-                      (RIGHT, ActionScheme2.TURN_RIGHT): DOWN, (LEFT, ActionScheme2.TURN_RIGHT):UP,
+                      (RIGHT, ActionScheme2.TURN_RIGHT): DOWN, (LEFT, ActionScheme2.TURN_RIGHT): UP,
                       (UP, ActionScheme2.TURN_RIGHT): RIGHT, (DOWN, ActionScheme2.TURN_RIGHT): LEFT}
 
     COLORS = ['blue', 'magenta', 'yellow', 'green']
@@ -32,8 +33,7 @@ class CookingWorld:
         't': Tomato,
         'l': Lettuce,
         'o': Onion,
-        'p': Plate,
-        'b': Blender
+        'p': Plate
     }
 
     # AGENT_ACTIONS: 0: Noop, 1: Left, 2: right, 3: down, 4: up, 5: interact
@@ -92,54 +92,48 @@ class CookingWorld:
                 if hasattr(obj.content[-1], 'free'):
                     obj.content[-1].free = True
 
-
     def perform_agent_actions(self, agents, actions):
-        for agent, action in zip(agents, actions):
-            agent.interacts_with = []
-            if action in self.action_scheme.WALK_ACTIONS:
-                if self.action_scheme == ActionScheme1:
-                    agent.change_orientation(action)
-                elif self.action_scheme == ActionScheme2:
-                    if action in [ActionScheme2.TURN_LEFT, ActionScheme2.TURN_RIGHT]:
-                        agent.change_orientation(self.agent_turn_map[(agent.orientation, action)])
-
-        cleaned_actions = self.check_inbounds(agents, actions)
-        collision_actions = self.check_collisions(agents, cleaned_actions)
-        for agent, action in zip(agents, collision_actions):
-            self.perform_agent_action(agent, action)
+        if self.action_scheme == ActionScheme1:
+            action_scheme1.perform_agent_actions(self, agents, actions)
+        elif self.action_scheme == ActionScheme2:
+            action_scheme2.perform_agent_actions(self, agents, actions)
+        elif self.action_scheme == ActionScheme3:
+            action_scheme3.perform_agent_actions(self, agents, actions)
+        else:
+            raise Exception("No valid Action Scheme Found")
         self.progress_world()
 
-    def perform_agent_action(self, agent: Agent, action):
-        if action in self.action_scheme.WALK_ACTIONS:
-            self.resolve_walking_action(agent, action)
-        if action in self.action_scheme.INTERACT_ACTIONS:
-            self.resolve_interaction(agent, action)
-
-    def resolve_walking_action(self, agent: Agent, action):
-        if self.action_scheme == ActionScheme1:
-            target_location = self.get_target_location(agent, action)
-        elif self.action_scheme == ActionScheme2:
-            if action == ActionScheme2.WALK:
-                target_location = self.get_target_location_scheme2(agent)
-            else:
-                return
-        else:
-            target_location = self.get_target_location(agent, action)
-        if self.square_walkable(target_location):
-            origin = self.get_objects_at(agent.location, StaticObject)
-            target = self.get_objects_at(target_location, StaticObject)
-            agent.move_to(target_location)
-            agent.interacts_with = [target[0]]
-            origin[0].content = []
-            target[0].add_content(agent)
-
-    def resolve_interaction(self, agent: Agent, action):
-        if action == self.action_scheme.INTERACT_PRIMARY:
-            self.resolve_primary_interaction(agent)
-        elif action == self.action_scheme.INTERACT_PICK_UP_SPECIAL:
-            self.resolve_interaction_pick_up_special(agent)
-        elif action == self.action_scheme.EXECUTE_ACTION:
-            self.resolve_execute_action(agent)
+    # def perform_agent_action(self, agent: Agent, action):
+    #     if action in self.action_scheme.WALK_ACTIONS:
+    #         self.resolve_walking_action(agent, action)
+    #     if action in self.action_scheme.INTERACT_ACTIONS:
+    #         self.resolve_interaction(agent, action)
+    #
+    # def resolve_walking_action(self, agent: Agent, action):
+    #     if self.action_scheme == ActionScheme1:
+    #         target_location = self.get_target_location(agent, action)
+    #     elif self.action_scheme == ActionScheme2:
+    #         if action == ActionScheme2.WALK:
+    #             target_location = self.get_target_location_scheme2(agent)
+    #         else:
+    #             return
+    #     else:
+    #         target_location = self.get_target_location(agent, action)
+    #     if self.square_walkable(target_location):
+    #         origin = self.get_objects_at(agent.location, StaticObject)
+    #         target = self.get_objects_at(target_location, StaticObject)
+    #         agent.move_to(target_location)
+    #         agent.interacts_with = [target[0]]
+    #         origin[0].content = []
+    #         target[0].add_content(agent)
+    #
+    # def resolve_interaction(self, agent: Agent, action):
+    #     if action == self.action_scheme.INTERACT_PRIMARY:
+    #         self.resolve_primary_interaction(agent)
+    #     elif action == self.action_scheme.INTERACT_PICK_UP_SPECIAL:
+    #         self.resolve_interaction_pick_up_special(agent)
+    #     elif action == self.action_scheme.EXECUTE_ACTION:
+    #         self.resolve_execute_action(agent)
 
     def resolve_primary_interaction(self, agent: Agent):
         interaction_location = self.get_target_location(agent, agent.orientation)
@@ -147,7 +141,6 @@ class CookingWorld:
             return
         dynamic_objects = self.get_objects_at(interaction_location, DynamicObject)
         static_object = self.get_objects_at(interaction_location, StaticObject)[0]
-
 
         if not agent.holding and not dynamic_objects:
             return

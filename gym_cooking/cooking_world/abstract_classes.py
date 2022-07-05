@@ -26,9 +26,9 @@ class Object(ABC):
     def numeric_state_representation(self):
         pass
 
-    @staticmethod
+    @classmethod
     @abstractmethod
-    def state_length():
+    def state_length(cls):
         pass
 
     @abstractmethod

@@ -16,7 +16,8 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = 'hide'
 
 class Game:
 
-    action_scheme_to_human_key_map = {ActionScheme1: KeyToTuple_human1, ActionScheme2: KeyToTuple_Scheme2_human1}
+    action_scheme_to_human_key_map = {ActionScheme1: KeyToTuple_human1, ActionScheme2: KeyToTuple_Scheme2_human1,
+                                      ActionScheme3: KeyToTuple_human1}
 
     def __init__(self, env, num_humans, ai_policies, max_steps=100, render=False):
         self._running = True

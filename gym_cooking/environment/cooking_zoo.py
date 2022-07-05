@@ -44,17 +44,17 @@ class CookingEnvironment(AECEnv):
 
     metadata = {'render.modes': ['human'], 'name': "cooking_zoo"}
 
-    action_scheme_map = {"scheme1": ActionScheme1, "scheme2": ActionScheme2}
+    action_scheme_map = {"scheme1": ActionScheme1, "scheme2": ActionScheme2, "scheme3": ActionScheme3}
 
     def __init__(self, level, num_agents, record, max_steps, recipes, obs_spaces=None, allowed_objects=None,
                  action_scheme="scheme1"):
         super().__init__()
 
         obs_spaces = obs_spaces or ["numeric"]
-        self.allowed_obs_spaces = ["symbolic", "numeric"]
+        self.allowed_obs_spaces = ["symbolic", "numeric", "numeric_main"]
         self.action_scheme = action_scheme
         self.action_scheme_class = self.action_scheme_map[self.action_scheme]
-        assert len(set(obs_spaces + self.allowed_obs_spaces)) == 2, \
+        assert len(set(obs_spaces + self.allowed_obs_spaces)) == 3, \
             f"Selected invalid obs spaces. Allowed {self.allowed_obs_spaces}"
         assert len(obs_spaces) != 0, f"Please select an observation space from: {self.allowed_obs_spaces}"
         self.obs_spaces = obs_spaces
@@ -84,7 +84,7 @@ class CookingEnvironment(AECEnv):
                              'agent_location': gym.spaces.Box(low=0, high=max(self.world.width, self.world.height),
                                                               shape=(2,)),
                              'goal_vector': gym.spaces.MultiBinary(NUM_GOALS)}
-        self.observation_spaces = {agent: gym.spaces.Dict(numeric_obs_space) for agent in self.possible_agents}
+        self.observation_spaces = {agent: numeric_obs_space for agent in self.possible_agents}
         self.action_spaces = {agent: gym.spaces.Discrete(len(self.action_scheme_class.ACTIONS))
                               for agent in self.possible_agents}
         self.has_reset = True
@@ -220,7 +220,19 @@ class CookingEnvironment(AECEnv):
             recipe.update_recipe_state(self.world)
             open_goals[idx] = recipe.goals_completed(NUM_GOALS)
             bonus = recipe.completed() * 0.1
-            rewards[idx] = (sum(goals_before) - sum(open_goals[idx]) + bonus) * 10
+            rewards[idx] = (sum(goals_before) - sum(open_goals[idx]) + bonus) * 5
+
+            # objects_to_seek = recipe.get_objects_to_seek()
+            # if objects_to_seek:
+            #     distances = []
+            #     for cls in objects_to_seek:
+            #         world_objects = self.world.world_objects[ClassToString[cls]]
+            #         min_distance = min([abs(self.world.agents[idx].location[0] - obj.location[0]) / self.world.height +
+            #                             abs(self.world.agents[idx].location[1] - obj.location[1]) / self.world.width
+            #                             for obj in world_objects])
+            #         distances.append(min_distance)
+            #
+            #     rewards[idx] -= min(distances)
 
         if all((recipe.completed() for recipe in self.recipe_graphs)):
             self.termination_info = "Terminating because all deliveries were completed"
@@ -231,31 +243,13 @@ class CookingEnvironment(AECEnv):
         tensor = np.zeros((self.world.width, self.world.height, self.graph_representation_length))
         objects = defaultdict(list)
         objects.update(self.world.world_objects)
-        idx = 0
-        for game_class in GAME_CLASSES:
-            if game_class is Agent:
-                continue
-            for obj in objects[game_class.__name__]:
+        state_idx = 0
+        for cls in self.world.world_objects:
+            for obj in self.world.world_objects[cls]:
                 x, y = obj.location
-                tensor[x, y, idx] += 1
-            idx += 1
-            for stateful_class in STATEFUL_GAME_CLASSES:
-                if issubclass(game_class, stateful_class):
-                    n = 1
-                    for obj in objects[game_class.__name__]:
-                        representation = self.handle_stateful_class_representation(obj, stateful_class)
-                        n = len(representation)
-                        x, y = obj.location
-                        for i in range(n):
-                            tensor[x, y, idx + i] += representation[i]
-                    idx += n
-        for agent in self.world.agents:
-            x, y = agent.location
-            tensor[x, y, idx] = 1
-            tensor[x, y, idx + 1] = 1 if agent.orientation == 1 else 0
-            tensor[x, y, idx + 2] = 1 if agent.orientation == 2 else 0
-            tensor[x, y, idx + 3] = 1 if agent.orientation == 3 else 0
-            tensor[x, y, idx + 4] = 1 if agent.orientation == 4 else 0
+                for idx, value in enumerate(obj.numeric_state_representation()):
+                    tensor[x, y, state_idx + idx] = value
+            state_idx += StringToClass[cls].state_length()
         return tensor
 
     def get_agent_names(self):
@@ -263,13 +257,3 @@ class CookingEnvironment(AECEnv):
 
     def render(self, mode='human'):
         pass
-
-    @staticmethod
-    def handle_stateful_class_representation(obj, stateful_class):
-        if stateful_class is ChopFood:
-            return [int(obj.chop_state == ChopFoodStates.CHOPPED)]
-        if stateful_class is BlenderFood:
-            return [obj.current_progress]
-        if stateful_class is ToasterFood:
-            return [obj.current_progress]
-        raise ValueError(f"Could not process stateful class {stateful_class}")

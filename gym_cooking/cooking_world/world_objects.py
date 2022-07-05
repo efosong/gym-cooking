@@ -22,10 +22,10 @@ class Floor(StaticObject, ContentObject):
         self.content.append(content)
 
     def numeric_state_representation(self):
-        return 1
+        return 1,
 
-    @staticmethod
-    def state_length():
+    @classmethod
+    def state_length(cls):
         return 1
 
     def file_name(self) -> str:
@@ -58,10 +58,10 @@ class Counter(StaticObject, ContentObject):
         self.content[-1].free = True
 
     def numeric_state_representation(self):
-        return 1
+        return 1,
 
-    @staticmethod
-    def state_length():
+    @classmethod
+    def state_length(cls):
         return 1
 
     def file_name(self) -> str:
@@ -93,10 +93,10 @@ class Deliversquare(StaticObject, ContentObject):
         return True
 
     def numeric_state_representation(self):
-        return 1
+        return 1,
 
-    @staticmethod
-    def state_length():
+    @classmethod
+    def state_length(cls):
         return 1
 
     def file_name(self) -> str:
@@ -159,394 +159,14 @@ class Cutboard(StaticObject, ActionObject, ContentObject):
             raise Exception(f"Tried to add invalid object {content.__name__} to CutBoard")
 
     def numeric_state_representation(self):
-        return 1
+        return 1,
 
-    @staticmethod
-    def state_length():
+    @classmethod
+    def state_length(cls):
         return 1
 
     def file_name(self) -> str:
         return "cutboard"
-
-    def icons(self) -> List[str]:
-        return []
-
-    def display_text(self) -> str:
-        return ""
-
-class Breadslicer(StaticObject, ActionObject, ContentObject):
-
-    def __init__(self, unique_id, location):
-        super().__init__(unique_id, location, False)
-
-        self.max_content = 1
-
-    def action(self) -> Tuple[List, List, bool]:
-        valid = self.status == ActionObjectState.READY
-        if valid:
-            for obj in self.content:
-                if isinstance(obj, ChopFood):
-                    new_obj_list, deleted_obj_list, action_executed = obj.chop()
-
-                if action_executed:
-                    for del_obj in deleted_obj_list:
-                        self.content.remove(del_obj)
-                    for new_obj in new_obj_list:
-                        self.content.append(new_obj)
-
-                    self.status = ActionObjectState.NOT_USABLE
-
-                    return new_obj_list, deleted_obj_list, action_executed
-                else:
-                    return [], [], False
-        else:
-            return [], [], False
-
-    def accepts(self, dynamic_object) -> bool:
-        return isinstance(dynamic_object, ChopFood) and len(self.content) < self.max_content and \
-                dynamic_object.chop_state == ChopFoodStates.FRESH
-
-    def releases(self) -> bool:
-        if len(self.content) == 1:
-            self.status = ActionObjectState.NOT_USABLE
-        return True
-
-    def add_content(self, content):
-        # self.content.append(content)
-
-        if self.accepts(content):
-            self.status = ActionObjectState.READY
-            self.content.append(content)
-            for c in self.content:
-                c.free = False
-            self.content[-1].free = True
-        else:
-            raise Exception(f"Tried to add invalid object {content.__name__} to CutBoard")
-
-    def numeric_state_representation(self):
-        return 1
-
-    @staticmethod
-    def state_length():
-        return 1
-
-    def file_name(self) -> str:
-        return "default_static"
-
-    def icons(self) -> List[str]:
-        return []
-
-    def display_text(self) -> str:
-        return "BS"
-
-#TODO not finished
-class Oven(StaticObject, ProgressingObject, ContentObject, ToggleObject, ActionObject):
-
-    def __init__(self, unique_id, location):
-        super().__init__(unique_id, location, False)
-        self.max_content = 1
-
-    def process(self):
-        assert len(self.content) <= self.max_content, "Too many Dynamic Objects placed into the Oven"
-
-        if self.content and self.toggle:
-            self.content[0].apply_temperature(Temperature.HOT)
-            if self.content[0].done():
-                self.switch_toggle()
-
-                self.status = ActionObjectState.NOT_USABLE
-
-                for cont in self.content:
-                    cont.current_progress = cont.min_progress
-
-    def accepts(self, dynamic_object) -> bool:
-        return isinstance(dynamic_object, TemperatureObject) and (not self.toggle) and len(self.content) + 1 <= self.max_content
-
-    def releases(self) -> bool:
-        return not self.toggle
-
-    def add_content(self, content):
-        self.content.append(content)
-        for c in self.content:
-            c.free = False
-        self.content[-1].free = True
-
-    def action(self) -> Tuple[List, List, bool]:
-        self.switch_toggle()
-        return [], [], True
-
-    def numeric_state_representation(self):
-        return 1
-
-    @staticmethod
-    def state_length():
-        return 1
-
-    def file_name(self) -> str:
-        return "Oven_on" if self.toggle else "Oven"
-
-    def icons(self) -> List[str]:
-        return []
-
-    def display_text(self) -> str:
-        return ""
-
-
-class Blender(StaticObject, ProcessingObject, ContentObject, ToggleObject, ActionObject):
-
-    def __init__(self, unique_id, location):
-        super().__init__(unique_id, location, False)
-        self.max_content = 1
-
-    def process(self):
-        assert len(self.content) <= self.max_content, "Too many Dynamic Objects placed into the Blender"
-
-        if self.content and self.toggle:
-
-            for con in self.content:
-                con.blend()
-
-            if all([cont.blend_state == BlenderFoodStates.MASHED for cont in self.content]):
-                self.switch_toggle()
-
-                self.status = ActionObjectState.NOT_USABLE
-
-                for cont in self.content:
-                    cont.current_progress = cont.min_progress
-
-    def accepts(self, dynamic_object) -> bool:
-        return isinstance(dynamic_object, BlenderFood) and (not self.toggle) and len(self.content) + 1 <= self.max_content and dynamic_object.blend_state == BlenderFoodStates.FRESH
-
-    def releases(self) -> bool:
-        valid = not self.toggle
-        if valid:
-            # if last removed, not usable
-            if len(self.content) - 1 == 0:
-                self.status = ActionObjectState.NOT_USABLE
-        return valid
-
-    def add_content(self, content):
-        if self.accepts(content):
-            self.status = ActionObjectState.READY
-            self.content.append(content)
-            for c in self.content:
-                c.free = False
-            self.content[-1].free = True
-
-    def action(self) -> Tuple[List, List, bool]:
-        valid = self.status == ActionObjectState.READY
-        if valid:
-            self.switch_toggle()
-        return [], [], valid
-
-    def numeric_state_representation(self):
-        return 1
-
-    @staticmethod
-    def state_length():
-        return 1
-
-    def file_name(self) -> str:
-        return "blender_on" if self.toggle else "blender3"
-
-    def icons(self) -> List[str]:
-        return []
-
-    def display_text(self) -> str:
-        return ""
-
-
-class Toaster(StaticObject, ProcessingObject, ContentObject, ToggleObject, ActionObject):
-
-    def __init__(self, unique_id, location):
-        super().__init__(unique_id, location, False)
-        self.max_content = 2
-
-    def process(self):
-        assert len(self.content) <= self.max_content, "Too many Dynamic Objects placed into the Toaster"
-        if self.content and self.toggle:
-            for con in self.content:
-                con.toast()
-
-            if all([cont.toast_state == ToasterFoodStates.TOASTED for cont in self.content]):
-                self.switch_toggle()
-
-                self.status = ActionObjectState.NOT_USABLE
-
-                # reset progress, to be prooessed again.. different counters for different tools actually?
-                for cont in self.content:
-                    cont.current_progress = cont.min_progress
-
-    def accepts(self, dynamic_object) -> bool:
-
-        added = len(self.content) + 1 <= self.max_content and \
-                (not self.toggle) and \
-                isinstance(dynamic_object, ToasterFood) and \
-                dynamic_object.toast_state == ToasterFoodStates.READY and \
-                all([c.toast_state == ToasterFoodStates.READY for c in self.content])
-        return added
-
-    def releases(self) -> bool:
-        valid = not self.toggle
-        if valid:
-            # if last removed, not usable
-            if len(self.content) - 1 == 0:
-                self.status = ActionObjectState.NOT_USABLE
-        return valid
-
-    def add_content(self, content):
-        if self.accepts(content):
-            self.status = ActionObjectState.READY
-            self.content.append(content)
-        else:
-            raise Exception(f"Tried to add invalid object {content.__name__} to Toaster")
-
-    def action(self) -> Tuple[List, List, bool]:
-        valid = self.status == ActionObjectState.READY
-        if valid:
-            self.switch_toggle()
-        return [], [], valid
-
-    def numeric_state_representation(self):
-        return 1
-
-    @staticmethod
-    def state_length():
-        return 1
-
-    def file_name(self) -> str:
-        return "toaster_on" if self.toggle else "toaster_off"
-
-    def icons(self) -> List[str]:
-        return []
-
-    def display_text(self) -> str:
-        return ""
-
-
-class Microwave(StaticObject, ProcessingObject, ContentObject, ToggleObject, ActionObject):
-
-    def __init__(self, unique_id, location):
-        super().__init__(unique_id, location, False)
-        self.max_content = 1
-
-    def process(self):
-        assert len(self.content) <= self.max_content, "Too many Dynamic Objects placed into the Toaster"
-        if self.content and self.toggle:
-            for con in self.content:
-                con.microwave()
-
-            if all([cont.microwave_state == MicrowaveFoodStates.HOT for cont in self.content]):
-                self.switch_toggle()
-
-                self.status = ActionObjectState.NOT_USABLE
-
-                for cont in self.content:
-                    cont.current_progress = cont.min_progress
-
-    def accepts(self, dynamic_object) -> bool:
-        return len(self.content) + 1 <= self.max_content and (not self.toggle) and \
-               isinstance(dynamic_object, MicrowaveFood) and dynamic_object.microwave_state == MicrowaveFoodStates.READY
-
-    def releases(self) -> bool:
-        valid = not self.toggle
-        if valid:
-            # if last removed, not usable
-            if len(self.content) - 1 == 0:
-                self.status = ActionObjectState.NOT_USABLE
-        return valid
-
-    def add_content(self, content):
-        if self.accepts(content):
-            self.status = ActionObjectState.READY
-            self.content.append(content)
-            for c in self.content:
-                c.free = False
-            self.content[-1].free = True
-        else:
-            raise Exception(f"Tried to add invalid object {content.__name__} to Toaster")
-
-    def action(self) -> Tuple[List, List, bool]:
-        valid = self.status == ActionObjectState.READY
-        if valid:
-            self.switch_toggle()
-        return [], [], valid
-
-    def numeric_state_representation(self):
-        return 1
-
-    @staticmethod
-    def state_length():
-        return 1
-
-    def file_name(self) -> str:
-        return "Microwave_on" if self.toggle else "Microwave"
-
-    def icons(self) -> List[str]:
-        return []
-
-    def display_text(self) -> str:
-        return ""
-
-
-class Pot(StaticObject, ProcessingObject, ContentObject, ToggleObject, ActionObject):
-
-    def __init__(self, unique_id, location):
-        super().__init__(unique_id, location, False)
-        self.max_content = 1
-
-    def process(self):
-        assert len(self.content) <= self.max_content, "Too many Dynamic Objects placed into the Pot"
-        if self.content and self.toggle:
-            for con in self.content:
-                con.boil()
-
-            if all([cont.boil_state == PotFoodStates.COOKED for cont in self.content]):
-                self.switch_toggle()
-
-                self.status = ActionObjectState.NOT_USABLE
-
-                for cont in self.content:
-                    cont.current_progress = cont.min_progress
-
-    def accepts(self, dynamic_object) -> bool:
-        return len(self.content) < self.max_content and (not self.toggle) and \
-               isinstance(dynamic_object, PotFood) and dynamic_object.boil_state == PotFoodStates.READY
-
-    def releases(self) -> bool:
-        valid = not self.toggle
-        if valid:
-            # if last removed, not usable
-            if len(self.content) - 1 == 0:
-                self.status = ActionObjectState.NOT_USABLE
-        return valid
-
-    def add_content(self, content):
-        if self.accepts(content):
-            self.status = ActionObjectState.READY
-            self.content.append(content)
-            for c in self.content:
-                c.free = False
-            self.content[-1].free = True
-        else:
-            raise Exception(f"Tried to add invalid object {content.__name__} to Pot")
-
-    def action(self) -> Tuple[List, List, bool]:
-        valid = self.status == ActionObjectState.READY
-        if valid:
-            self.switch_toggle()
-        return [], [], valid
-
-
-    def numeric_state_representation(self):
-        return 1
-
-    @staticmethod
-    def state_length():
-        return 1
-
-    def file_name(self) -> str:
-        return "Pot_on" if self.toggle else "Pot"
 
     def icons(self) -> List[str]:
         return []
@@ -580,10 +200,10 @@ class Plate(DynamicObject, ContentObject):
         return isinstance(dynamic_object, Food) and dynamic_object.done() and len(self.content) < self.max_content
 
     def numeric_state_representation(self):
-        return 1
+        return 1,
 
-    @staticmethod
-    def state_length():
+    @classmethod
+    def state_length(cls):
         return 1
 
     def file_name(self) -> str:
@@ -608,10 +228,10 @@ class Onion(ChopFood):
             return False
 
     def numeric_state_representation(self):
-        return 1, 1
+        return 1, int(self.chop_state == ChopFoodStates.CHOPPED)
 
-    @staticmethod
-    def state_length():
+    @classmethod
+    def state_length(cls):
         return 2
 
     def file_name(self) -> str:
@@ -639,10 +259,10 @@ class Tomato(ChopFood):
             return False
 
     def numeric_state_representation(self):
-        return 1, 0
+        return 1, int(self.chop_state == ChopFoodStates.CHOPPED)
 
-    @staticmethod
-    def state_length():
+    @classmethod
+    def state_length(cls):
         return 2
 
     def file_name(self) -> str:
@@ -658,34 +278,6 @@ class Tomato(ChopFood):
         return ""
 
 
-class Cucumber(ChopFood):
-
-    def __init__(self, unique_id, location):
-        super().__init__(unique_id, location)
-
-    def done(self):
-        if self.chop_state == ChopFoodStates.CHOPPED:
-            return True
-        else:
-            return False
-
-    def numeric_state_representation(self):
-        return 1, 0
-
-    @staticmethod
-    def state_length():
-        return 2
-
-    def file_name(self) -> str:
-        return "default_dynamic"
-
-    def icons(self) -> List[str]:
-        return []
-
-    def display_text(self) -> str:
-        return "Cu " + str(self.chop_state.value[:3])
-
-
 class Lettuce(ChopFood):
 
     def __init__(self, unique_id, location):
@@ -698,10 +290,10 @@ class Lettuce(ChopFood):
             return False
 
     def numeric_state_representation(self):
-        return 1, 0
+        return 1, int(self.chop_state == ChopFoodStates.CHOPPED)
 
-    @staticmethod
-    def state_length():
+    @classmethod
+    def state_length(cls):
         return 2
 
     def file_name(self) -> str:
@@ -715,343 +307,6 @@ class Lettuce(ChopFood):
 
     def display_text(self) -> str:
         return ""
-
-
-class Carrot(BlenderFood, ChopFood):
-
-    def __init__(self, unique_id, location):
-        super().__init__(unique_id, location)
-
-    def done(self):
-        if self.chop_state == ChopFoodStates.CHOPPED or self.blend_state == BlenderFoodStates.MASHED:
-            return True
-        else:
-            return False
-
-    def numeric_state_representation(self):
-        return 1, 0, 1
-
-    @staticmethod
-    def state_length():
-        return 3
-
-    def file_name(self) -> str:
-        if self.done():
-            if self.chop_state == ChopFoodStates.CHOPPED:
-                return "ChoppedCarrot"
-            elif self.blend_state == BlenderFoodStates.MASHED:
-                return "CarrotMashed"
-        else:
-            return "FreshCarrot"
-
-    def icons(self) -> List[str]:
-        return []
-
-    def display_text(self) -> str:
-        return ""
-
-
-class Salt(Food, DynamicObject):
-
-    def __init__(self, unique_id, location):
-        super().__init__(unique_id, location)
-
-    def done(self):
-        return True
-
-    def numeric_state_representation(self):
-        return 1, 0, 0
-
-    @staticmethod
-    def state_length():
-        return 3
-
-    def file_name(self) -> str:
-        return "Salt"
-
-    def icons(self) -> List[str]:
-        return []
-
-    def display_text(self) -> str:
-        return ""
-
-
-class Banana(BlenderFood, ChopFood):
-
-    def __init__(self, unique_id, location):
-        super().__init__(unique_id, location)
-
-    def done(self):
-        if self.chop_state == ChopFoodStates.CHOPPED or self.blend_state == BlenderFoodStates.MASHED:
-            return True
-        else:
-            return False
-
-    def numeric_state_representation(self):
-        return 1, 0, 1
-
-    @staticmethod
-    def state_length():
-        return 3
-
-    def file_name(self) -> str:
-        return "default_dynamic"
-
-    def icons(self) -> List[str]:
-        return []
-
-    def display_text(self) -> str:
-        return f"BN {self.chop_state.value[:3]} {self.blend_state.value[:3]}"
-
-
-class Apple(BlenderFood, ChopFood):
-
-    def __init__(self, unique_id, location):
-        super().__init__(unique_id, location)
-
-    def done(self):
-        if self.chop_state == ChopFoodStates.CHOPPED or self.blend_state == BlenderFoodStates.MASHED:
-            return True
-        else:
-            return False
-
-    def numeric_state_representation(self):
-        return 1, 0, 1
-
-    @staticmethod
-    def state_length():
-        return 3
-
-    def file_name(self) -> str:
-        return "default_dynamic"
-
-    def icons(self) -> List[str]:
-        return []
-
-    def display_text(self) -> str:
-        return f"AP {self.chop_state.value[:3]} {self.blend_state.value[:3]}"
-
-
-class Watermelon(ChopFood):
-
-    def __init__(self, unique_id, location):
-        super().__init__(unique_id, location)
-
-    def done(self):
-        if self.chop_state == ChopFoodStates.CHOPPED:
-            return True
-        else:
-            return False
-
-    def numeric_state_representation(self):
-        return 1, 0, 1
-
-    @staticmethod
-    def state_length():
-        return 3
-
-    def file_name(self) -> str:
-        return "default_dynamic"
-
-    def icons(self) -> List[str]:
-        return []
-
-    def display_text(self) -> str:
-        return f"WM {self.chop_state.value[:3]}"
-
-
-class Bagel(ChopFood, ToasterFood):
-
-    def __init__(self, unique_id, location):
-        super().__init__(unique_id, location)
-        self.slices = 2
-        self.chop_state = ChopFoodStates.FRESH
-        self.toast_state = ToasterFoodStates.FRESH
-
-    def done(self):
-        return self.chop_state == ChopFoodStates.CHOPPED
-
-    def chop(self):
-        if self.slices > 1:
-
-            self.slices -= 1
-            if self.slices == 1:
-                self.chop_state = ChopFoodStates.CHOPPED
-                self.toast_state = ToasterFoodStates.READY
-            return [], [], True
-        else:
-            return [], [], False
-
-    def numeric_state_representation(self):
-        return 1, 0, 0
-
-    @staticmethod
-    def state_length():
-        return 3
-
-    def file_name(self) -> str:
-        return "default_dynamic"
-
-    def icons(self) -> List[str]:
-        return []
-
-    def display_text(self) -> str:
-        return f"BG {self.chop_state.value[:3]} {self.toast_state.value[:3]}"
-
-
-class Bread(ChopFood, ToasterFood):
-
-    def __init__(self, unique_id, location):
-        super().__init__(unique_id, location)
-        self.slices = 2
-        self.chop_state = ChopFoodStates.FRESH
-        self.toast_state = ToasterFoodStates.FRESH
-
-    def done(self):
-        return self.chop_state == ChopFoodStates.CHOPPED
-
-    def chop(self):
-        if self.slices > 1:
-            # new_bread = Bread(unique_id=-1, location=self.location)
-            # new_bread.slices = 1
-            # new_bread.chop_state = ChopFoodStates.CHOPPED
-            # new_bread.toast_state = ToasterFoodStates.READY
-
-            self.slices -= 1
-            if self.slices == 1:
-                self.chop_state = ChopFoodStates.CHOPPED
-                self.toast_state = ToasterFoodStates.READY
-            return [], [], True
-        else:
-            return [], [], False
-
-    def numeric_state_representation(self):
-        return 1, 0, 0
-
-    @staticmethod
-    def state_length():
-        return 3
-
-    def file_name(self) -> str:
-        if self.toast_state == ToasterFoodStates.TOASTED:
-            return "ChoppedToastedBread"
-        elif self.chop_state == ChopFoodStates.CHOPPED:
-            return "ChoppedFreshBread"
-        else:
-            return "Bread"
-
-    def icons(self) -> List[str]:
-        return []
-
-    def display_text(self) -> str:
-        return f"{self.unique_id} {'T' if self.free else 'F'}"
-
-
-# class BreadSlice(ToasterFood):
-#
-#     def __init__(self, unique_id, location):
-#         super().__init__(unique_id, location)
-#         self.toast_state = ToasterFoodStates.READY
-#
-#     def done(self):
-#         return self.toast_state == ToasterFoodStates.TOASTED
-#
-#     def toast(self):
-#         if self.toast_state == ToasterFoodStates.READY or self.toast_state == ToasterFoodStates.IN_PROGRESS:
-#             self.current_progress -= 1
-#             self.toast_state = ToasterFoodStates.IN_PROGRESS if self.current_progress < self.max_progress \
-#                 else ToasterFoodStates.TOASTED
-#             return True
-#         return False
-#
-#     def numeric_state_representation(self):
-#         return 1, 0, 0
-#
-#     @staticmethod
-#     def state_length():
-#         return 3
-#
-#     def file_name(self) -> str:
-#         if self.toast_state == ToasterFoodStates.TOASTED:
-#             return "ChoppedToastedBread"
-#         else:
-#             return "ChoppedFreshBread"
-#
-
-
-class Spaghetti(MicrowaveFood, PotFood):
-
-    def __init__(self, unique_id, location):
-        super().__init__(unique_id, location)
-
-        start_state = np.random.randint(0, 2)
-        if start_state == 0:
-            self.microwave_state = MicrowaveFoodStates.FRESH
-            self.boil_state = PotFoodStates.READY
-        else:
-            self.microwave_state = MicrowaveFoodStates.READY
-            self.boil_state = PotFoodStates.COOKED
-
-    # only used for determing if food can be on plate
-    def done(self):
-        return True
-
-    def numeric_state_representation(self):
-        return 1, 1, 1
-
-    @staticmethod
-    def state_length():
-        return 3
-
-    def file_name(self) -> str:
-        if self.microwave_state == MicrowaveFoodStates.READY or self.microwave_state == MicrowaveFoodStates.IN_PROGRESS:
-            return "SpaghettiCookedCold"
-        elif self.microwave_state == MicrowaveFoodStates.HOT or self.boil_state == PotFoodStates.COOKED:
-            return "SpaghettiCooked"
-        else:
-            return "SpaghettiRaw"
-
-
-class Penne(MicrowaveFood, PotFood):
-
-    def __init__(self, unique_id, location):
-        super().__init__(unique_id, location)
-
-        start_state = np.random.randint(0, 2)
-        if start_state == 0:
-            self.microwave_state = MicrowaveFoodStates.FRESH
-            self.boil_state = PotFoodStates.READY
-        else:
-            self.microwave_state = MicrowaveFoodStates.READY
-            self.boil_state = PotFoodStates.COOKED
-
-    # only used for determing if food can be on plate
-    def done(self):
-        return True
-
-    def numeric_state_representation(self):
-        return 1, 1, 1
-
-    @staticmethod
-    def state_length():
-        return 3
-
-    def file_name(self) -> str:
-        if self.microwave_state == MicrowaveFoodStates.READY or self.microwave_state == MicrowaveFoodStates.IN_PROGRESS:
-            return "PenneCookedCold"
-        elif self.microwave_state == MicrowaveFoodStates.HOT or self.boil_state == PotFoodStates.COOKED:
-            return "PenneCooked"
-        else:
-            return "PenneRaw"
-
-    def icons(self) -> List[str]:
-        return []
-
-    def display_text(self) -> str:
-        return ""
-
-    # def get_physical_state(self) -> dict:
-    #     return {}
 
 
 class Agent(Object):
@@ -1085,8 +340,8 @@ class Agent(Object):
         return 1, int(self.orientation == 1), int(self.orientation == 2), int(self.orientation == 3), \
                int(self.orientation == 4)
 
-    @staticmethod
-    def state_length():
+    @classmethod
+    def state_length(cls):
         return 5
 
     def file_name(self) -> str:

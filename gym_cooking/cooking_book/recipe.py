@@ -11,8 +11,7 @@ class NodeTypes(Enum):
 
 class RecipeNode:
 
-    def __init__(self, root_type, id_num, name, parent=None, conditions=None, contains=None,
-                 node_type=NodeTypes.CHECKPOINT):
+    def __init__(self, root_type, id_num, name, parent=None, conditions=None, contains=None, objects_to_seek=None):
         self.parent = parent
         self.achieved = False
         self.id_num = id_num
@@ -21,7 +20,7 @@ class RecipeNode:
         self.contains = contains or []
         self.world_objects = []
         self.name = name
-        self.node_type = node_type
+        self.objects_to_seek = objects_to_seek or []
 
     def is_leaf(self):
         return not bool(self.contains)
@@ -38,6 +37,14 @@ class Recipe:
         for node in self.node_list:
             goals[node.id_num] = int(not node.achieved)
         return goals
+
+    def get_objects_to_seek(self):
+        objects_to_seek = set()
+        for node in self.node_list:
+            if node.achieved or not all((contains.achieved for contains in node.contains)):
+                continue
+            objects_to_seek.update(node.objects_to_seek)
+        return objects_to_seek
 
     def completed(self):
         return self.root_node.achieved
