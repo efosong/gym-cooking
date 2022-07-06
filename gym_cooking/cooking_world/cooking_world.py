@@ -260,13 +260,22 @@ class CookingWorld:
                 while True:
                     x = self.np_random.choice(dynamic_object[name]["X_POSITION"])
                     y = self.np_random.choice(dynamic_object[name]["Y_POSITION"])
+                    state = dynamic_object[name].get("STATE", "")
                     if x < 0 or y < 0 or x > self.width or y > self.height:
                         raise ValueError(f"Position {x} {y} of object {name} is out of bounds set by the level layout!")
                     static_objects_loc = self.get_objects_at((x, y), Counter)
                     dynamic_objects_loc = self.get_objects_at((x, y), DynamicObject)
-
-                    if len(static_objects_loc) == 1 and not dynamic_objects_loc:
+                    plate_obj = [o for o in dynamic_objects_loc if isinstance(o, Plate)]
+                    if (len(static_objects_loc) == 1
+                            and (
+                                (len(plate_obj) == 1 and state == "CHOPPED")
+                                or len(dynamic_objects_loc) == 0)
+                            ):
                         obj = StringToClass[name](location=(x, y))
+                        if state == "CHOPPED":
+                            obj.chop()
+                        if len(plate_obj) == 1:
+                            plate_obj[0].add_content(obj)
                         self.add_object(obj)
                         break
                     else:
