@@ -15,6 +15,7 @@ from pettingzoo.utils.conversions import parallel_wrapper_fn
 
 import gym
 from gym.spaces import Discrete, Box, MultiBinary, Dict
+from gym.utils import colorize
 
 
 CollisionRepr = namedtuple("CollisionRepr", "time agent_names agent_locations")
@@ -45,7 +46,6 @@ def env(
         obs_spaces=obs_spaces,
         completion_reward_frac=completion_reward_frac,
         )
-    env_init = wrappers.CaptureStdoutWrapper(env_init)
     env_init = wrappers.AssertOutOfBoundsWrapper(env_init)
     env_init = wrappers.OrderEnforcingWrapper(env_init)
     return env_init
@@ -58,7 +58,7 @@ class CookingEnvironment(AECEnv):
     """Environment object for Overcooked."""
 
     metadata = {
-        "render_modes": ["human"],
+        "render_modes": ["human", "ansi"],
         "name": "cooking_zoo",
         "is_parallelizable": True}
 
@@ -301,10 +301,6 @@ class CookingEnvironment(AECEnv):
             rewards[idx] = ((1-self.completion_reward_frac)*n_completed_goals/len(recipe.node_list)
                             + self.completion_reward_frac*recipe.completed())
 
-            if rewards[idx] < 0:
-                print(f"Goals before: {goals_before}")
-                print(f"Goals after: {open_goals}")
-
         if all((recipe.completed() for recipe in self.recipe_graphs)):
             self.termination_info = "Terminating because all deliveries were completed"
             done = True
@@ -408,7 +404,61 @@ class CookingEnvironment(AECEnv):
         return [agent.name for agent in self.world.agents]
 
     def render(self, mode='human'):
-        pass
+        if mode == "ansi":
+            return self._render_ansi()
+
+    def _render_ansi(self):
+        # TODO this is kind hacky and confusing, and will only work with tomato + lettuce.
+        grid = np.full((self.world.width, self.world.height), " ", dtype=object)
+        # render counters
+        for counter in self.world.world_objects["Counter"]:
+            x, y = counter.location
+            grid[x, y] = colorize(" ", color="gray", highlight=True)
+        for cut_board in self.world.world_objects["CutBoard"]:
+            x, y = cut_board.location
+            grid[x, y] = colorize(" ", color="yellow", highlight=True)
+        for deliver_square in self.world.world_objects["DeliverSquare"]:
+            x, y = deliver_square.location
+            grid[x, y] = colorize(" ", color="cyan", highlight=True)
+        # render counter items
+        # spawn tomatoes first
+        for tomato in self.world.world_objects["Tomato"]:
+            x, y = tomato.location
+            tomato_color = "magenta" if tomato.chop_state == ChopFoodStates.CHOPPED else "red"
+            tomato_string = colorize("●", tomato_color)
+            grid[x, y] = grid[x, y].replace(" ", tomato_string)
+        for lettuce in self.world.world_objects["Lettuce"]:
+            x, y = lettuce.location
+            lettuce_color = "blue" if lettuce.chop_state == ChopFoodStates.CHOPPED else "green"
+            # cover the case where there's already a tomato there (i.e. chopped lettuce + tomato)
+            # won't do anything if there isn't already a chopped tomato there
+            lettuce_tomato_string = colorize("●", "yellow")
+            grid[x, y] = grid[x, y].replace("●", lettuce_tomato_string)
+            # add the lettuce in the case that it's an empty space
+            lettuce_string = colorize("●", lettuce_color)
+            grid[x, y] = grid[x, y].replace(" ", lettuce_string)
+        # then spawn plates, which take on the color of any lettuce/tomato on them
+        for plate in self.world.world_objects["Plate"]:
+            x, y = plate.location
+            grid[x, y] = grid[x, y].replace(" ", "O")
+            grid[x, y] = grid[x, y].replace("●", "O")
+        # render agents
+        for agent in self.world.agents:
+            x, y = agent.location
+            if agent.holding is None:
+                symbols = "▲▼▶◀"
+                symbol = symbols[agent.orientation-1]
+                grid[x, y] = grid[x, y].replace(" ", symbol)
+            elif isinstance(agent.holding, Tomato):
+                tomato = agent.holding
+                symbols = "▲▼▶◀"
+                symbol = symbols[agent.orientation-1]
+                grid[x, y] = grid[x, y].replace("●", symbol)
+            elif isinstance(agent.holding, Plate):
+                symbols = "△▽▷◁"
+                symbol = symbols[agent.orientation-1]
+                grid[x, y] = grid[x, y].replace("O", symbol)
+        return "\n".join(("".join(row) for row in grid)) + "\n"
 
     @staticmethod
     def get_stateful_class(game_class):
