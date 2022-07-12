@@ -222,6 +222,8 @@ class CookingEnvironment(AECEnv):
             bonus = recipe.completed() * 0.1
             rewards[idx] = (sum(goals_before) - sum(open_goals[idx]) + bonus) * 5
 
+            rewards[idx] -= 0.05
+
             # objects_to_seek = recipe.get_objects_to_seek()
             # if objects_to_seek:
             #     distances = []
