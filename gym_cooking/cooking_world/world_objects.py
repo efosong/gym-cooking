@@ -24,9 +24,16 @@ class Floor(StaticObject, ContentObject):
     def numeric_state_representation(self):
         return 1,
 
+    def feature_vector_representation(self):
+        return []
+
     @classmethod
     def state_length(cls):
         return 1
+
+    @classmethod
+    def feature_vector_length(cls):
+        return 0
 
     def file_name(self) -> str:
         return "floor"
@@ -60,9 +67,16 @@ class Counter(StaticObject, ContentObject):
     def numeric_state_representation(self):
         return 1,
 
+    def feature_vector_representation(self):
+        return self.location
+
     @classmethod
     def state_length(cls):
         return 1
+
+    @classmethod
+    def feature_vector_length(cls):
+        return 2
 
     def file_name(self) -> str:
         return "counter"
@@ -94,6 +108,13 @@ class Deliversquare(StaticObject, ContentObject):
 
     def numeric_state_representation(self):
         return 1,
+
+    def feature_vector_representation(self):
+        return self.location
+
+    @classmethod
+    def feature_vector_length(cls):
+        return 2
 
     @classmethod
     def state_length(cls):
@@ -161,9 +182,16 @@ class Cutboard(StaticObject, ActionObject, ContentObject):
     def numeric_state_representation(self):
         return 1,
 
+    def feature_vector_representation(self):
+        return self.location
+
     @classmethod
     def state_length(cls):
         return 1
+
+    @classmethod
+    def feature_vector_length(cls):
+        return 2
 
     def file_name(self) -> str:
         return "cutboard"
@@ -202,9 +230,16 @@ class Plate(DynamicObject, ContentObject):
     def numeric_state_representation(self):
         return 1,
 
+    def feature_vector_representation(self):
+        return self.location
+
     @classmethod
     def state_length(cls):
         return 1
+
+    @classmethod
+    def feature_vector_length(cls):
+        return 2
 
     def file_name(self) -> str:
         return "Plate"
@@ -230,9 +265,16 @@ class Onion(ChopFood):
     def numeric_state_representation(self):
         return 1, int(self.chop_state == ChopFoodStates.CHOPPED)
 
+    def feature_vector_representation(self):
+        return list(self.location) + [int(self.chop_state == ChopFoodStates.CHOPPED)]
+
     @classmethod
     def state_length(cls):
         return 2
+
+    @classmethod
+    def feature_vector_length(cls):
+        return 3
 
     def file_name(self) -> str:
         if self.done():
@@ -261,9 +303,16 @@ class Tomato(ChopFood):
     def numeric_state_representation(self):
         return 1, int(self.chop_state == ChopFoodStates.CHOPPED)
 
+    def feature_vector_representation(self):
+        return list(self.location) + [int(self.chop_state == ChopFoodStates.CHOPPED)]
+
     @classmethod
     def state_length(cls):
         return 2
+
+    @classmethod
+    def feature_vector_length(cls):
+        return 3
 
     def file_name(self) -> str:
         if self.done():
@@ -292,9 +341,16 @@ class Lettuce(ChopFood):
     def numeric_state_representation(self):
         return 1, int(self.chop_state == ChopFoodStates.CHOPPED)
 
+    def feature_vector_representation(self):
+        return list(self.location) + [int(self.chop_state == ChopFoodStates.CHOPPED)]
+
     @classmethod
     def state_length(cls):
         return 2
+
+    @classmethod
+    def feature_vector_length(cls):
+        return 3
 
     def file_name(self) -> str:
         if self.done():
@@ -340,8 +396,16 @@ class Agent(Object):
         return 1, int(self.orientation == 1), int(self.orientation == 2), int(self.orientation == 3), \
                int(self.orientation == 4)
 
+    def feature_vector_representation(self):
+        return list(self.location) + [int(self.orientation == 1), int(self.orientation == 2),
+                                      int(self.orientation == 3), int(self.orientation == 4)]
+
     @classmethod
     def state_length(cls):
+        return 5
+
+    @classmethod
+    def feature_vector_length(cls):
         return 5
 
     def file_name(self) -> str:

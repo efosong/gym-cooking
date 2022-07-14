@@ -51,10 +51,10 @@ class CookingEnvironment(AECEnv):
         super().__init__()
 
         obs_spaces = obs_spaces or ["numeric"]
-        self.allowed_obs_spaces = ["symbolic", "numeric", "numeric_main"]
+        self.allowed_obs_spaces = ["symbolic", "numeric", "numeric_main", "feature_vector"]
         self.action_scheme = action_scheme
         self.action_scheme_class = self.action_scheme_map[self.action_scheme]
-        assert len(set(obs_spaces + self.allowed_obs_spaces)) == 3, \
+        assert len(set(obs_spaces + self.allowed_obs_spaces)) == 4, \
             f"Selected invalid obs spaces. Allowed {self.allowed_obs_spaces}"
         assert len(obs_spaces) != 0, f"Please select an observation space from: {self.allowed_obs_spaces}"
         self.obs_spaces = obs_spaces
@@ -76,6 +76,7 @@ class CookingEnvironment(AECEnv):
         self.termination_info = ""
         self.world.load_level(level=self.level, num_agents=num_agents)
         self.graph_representation_length = sum([cls.state_length() for cls in GAME_CLASSES])
+        self.feature_vector_representation_length = 67
 
         numeric_obs_space = {'symbolic_observation': gym.spaces.Box(low=0, high=10,
                                                                     shape=(self.world.width, self.world.height,
@@ -84,7 +85,13 @@ class CookingEnvironment(AECEnv):
                              'agent_location': gym.spaces.Box(low=0, high=max(self.world.width, self.world.height),
                                                               shape=(2,)),
                              'goal_vector': gym.spaces.MultiBinary(NUM_GOALS)}
-        self.observation_spaces = {agent: numeric_obs_space for agent in self.possible_agents}
+        self.feature_obs_space = gym.spaces.Box(low=-1, high=1,
+                                                shape=(self.feature_vector_representation_length,))
+        self.numeric_main_obs_space = gym.spaces.Box(low=0, high=10, shape=(self.world.width, self.world.height,
+                                                                            self.graph_representation_length))
+        obs_space_dict = {"numeric": numeric_obs_space, "numeric_main": self.numeric_main_obs_space,
+                          "feature_vector": self.feature_obs_space}
+        self.observation_spaces = {agent: obs_space_dict[obs_spaces[0]] for agent in self.possible_agents}
         self.action_spaces = {agent: gym.spaces.Discrete(len(self.action_scheme_class.ACTIONS))
                               for agent in self.possible_agents}
         self.has_reset = True
@@ -203,6 +210,10 @@ class CookingEnvironment(AECEnv):
             objects["Agent"] = self.world.agents
             sym_observation = copy.deepcopy(objects)
             observation.append(sym_observation)
+        if "numeric_main" in self.obs_spaces:
+            observation.append(self.current_tensor_observation)
+        if "feature_vector" in self.obs_spaces:
+            observation.append(self.get_feature_vector(agent))
         returned_observation = observation if not len(observation) == 1 else observation[0]
         return returned_observation
 
@@ -236,22 +247,45 @@ class CookingEnvironment(AECEnv):
             #
             #     rewards[idx] -= min(distances)
 
+        for idx, agent in enumerate(self.world.agents):
+            if not agent.interacts_with:
+                rewards[idx] -= 0.01
+
         if all((recipe.completed() for recipe in self.recipe_graphs)):
             self.termination_info = "Terminating because all deliveries were completed"
             done = True
         return done, rewards, open_goals
 
+    def get_feature_vector(self, agent):
+        feature_vector = []
+        objects = defaultdict(list)
+        objects.update(self.world.world_objects)
+        objects["Agent"] = self.world.agents
+        x, y = self.world_agent_mapping[agent].location
+        for cls in GAME_CLASSES:
+            for obj in objects[ClassToString[cls]]:
+                features = list(obj.feature_vector_representation())
+                if features and obj is not self.world_agent_mapping[agent]:
+                    features[0] = (features[0] - x) / self.world.width
+                    features[1] = (features[1] - y) / self.world.height
+                if obj is self.world_agent_mapping[agent]:
+                    features[0] = features[0] / self.world.width
+                    features[1] = features[1] / self.world.height
+                feature_vector.extend(features)
+        return np.array(feature_vector)
+
     def get_tensor_representation(self):
         tensor = np.zeros((self.world.width, self.world.height, self.graph_representation_length))
         objects = defaultdict(list)
         objects.update(self.world.world_objects)
+        objects["Agent"] = self.world.agents
         state_idx = 0
-        for cls in self.world.world_objects:
-            for obj in self.world.world_objects[cls]:
+        for cls in GAME_CLASSES:
+            for obj in objects[ClassToString[cls]]:
                 x, y = obj.location
                 for idx, value in enumerate(obj.numeric_state_representation()):
                     tensor[x, y, state_idx + idx] = value
-            state_idx += StringToClass[cls].state_length()
+            state_idx += cls.state_length()
         return tensor
 
     def get_agent_names(self):

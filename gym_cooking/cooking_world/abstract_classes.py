@@ -26,9 +26,18 @@ class Object(ABC):
     def numeric_state_representation(self):
         pass
 
+    @abstractmethod
+    def feature_vector_representation(self):
+        pass
+
     @classmethod
     @abstractmethod
     def state_length(cls):
+        pass
+
+    @classmethod
+    @abstractmethod
+    def feature_vector_length(cls):
         pass
 
     @abstractmethod
