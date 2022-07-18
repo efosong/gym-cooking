@@ -97,7 +97,8 @@ class CookingEnvironment(AECEnv):
         self.recipe_graphs = [RECIPES[recipe]() for recipe in recipes]
         self.completion_reward_frac = completion_reward_frac
 
-        self.termination_info = ""
+        self.terminated = False
+        self.truncated = False
         self.world.load_level(level=self.level, num_agents=num_agents)
         self.graph_representation_length = sum([tup[1] for tup in GAME_CLASSES_STATE_LENGTH]) + self.num_agents
         self.has_reset = True
@@ -186,7 +187,8 @@ class CookingEnvironment(AECEnv):
         self.t = 0
 
         # For tracking data during an episode.
-        self.termination_info = ""
+        self.truncated = False
+        self.terminated = False
 
         # Load world & distances.
         self.world.load_level(level=self.level, num_agents=len(self.possible_agents))
@@ -257,7 +259,7 @@ class CookingEnvironment(AECEnv):
         for agent in self.agents:
             self.current_tensor_observation[agent] = self.get_tensor_representation(agent)
 
-        info = {"t": self.t, "termination_info": self.termination_info}
+        info = {"t": self.t, "terminated": self.terminated, "truncated": self.truncated}
 
         done, rewards, goals = self.compute_rewards()
         for idx, agent in enumerate(self.agents):
@@ -290,7 +292,7 @@ class CookingEnvironment(AECEnv):
         open_goals = [[0]] * len(self.recipes)
         # Done if the episode maxes out
         if self.t >= self.max_steps and self.max_steps:
-            self.termination_info = f"Terminating because passed {self.max_steps} timesteps"
+            self.truncated = True
             done = True
 
         for idx, recipe in enumerate(self.recipe_graphs):
@@ -302,7 +304,7 @@ class CookingEnvironment(AECEnv):
                             + self.completion_reward_frac*recipe.completed())
 
         if all((recipe.completed() for recipe in self.recipe_graphs)):
-            self.termination_info = "Terminating because all deliveries were completed"
+            self.terminated = True
             done = True
         return done, rewards, open_goals
 
