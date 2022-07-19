@@ -53,9 +53,9 @@ no_recipe_node = RecipeNode(root_type=Deliversquare, id_num=next(id_generator), 
 # we started counting at zero.
 NUM_GOALS = next(id_generator)
 
-RECIPES = {"TomatoSalad": lambda: deepcopy(Recipe(TomatoSalad)),
-           "TomatoLettuceSalad": lambda: deepcopy(Recipe(TomatoLettuceSalad)),
-           "TomatoLettuceOnionSalad": lambda: deepcopy(Recipe(TomatoLettuceOnionSalad)),
+RECIPES = {"TomatoSalad": lambda: deepcopy(Recipe(TomatoSalad, NUM_GOALS)),
+           "TomatoLettuceSalad": lambda: deepcopy(Recipe(TomatoLettuceSalad, NUM_GOALS)),
+           "TomatoLettuceOnionSalad": lambda: deepcopy(Recipe(TomatoLettuceOnionSalad, NUM_GOALS)),
            # "MashedCarrot": lambda: deepcopy(Recipe(MashedCarrot)),
-           "no_recipe": lambda: deepcopy(Recipe(no_recipe_node))
+           "no_recipe": lambda: deepcopy(Recipe(no_recipe_node, NUM_GOALS))
            }

@@ -406,7 +406,7 @@ class Agent(Object):
 
     @classmethod
     def feature_vector_length(cls):
-        return 5
+        return 6
 
     def file_name(self) -> str:
         pass

@@ -76,7 +76,11 @@ class CookingEnvironment(AECEnv):
         self.termination_info = ""
         self.world.load_level(level=self.level, num_agents=num_agents)
         self.graph_representation_length = sum([cls.state_length() for cls in GAME_CLASSES])
-        self.feature_vector_representation_length = 67
+        objects = {}
+        objects.update(self.world.world_objects)
+        objects["Agent"] = self.world.agents
+        self.feature_vector_representation_length = sum([obj.feature_vector_length() for cls in GAME_CLASSES
+                                                         for obj in objects[ClassToString[cls]]])
 
         numeric_obs_space = {'symbolic_observation': gym.spaces.Box(low=0, high=10,
                                                                     shape=(self.world.width, self.world.height,
@@ -233,7 +237,7 @@ class CookingEnvironment(AECEnv):
             bonus = recipe.completed() * 0.1
             rewards[idx] = (sum(goals_before) - sum(open_goals[idx]) + bonus) * 5
 
-            rewards[idx] -= 0.05
+            rewards[idx] -= (5 / self.max_steps)
 
             # objects_to_seek = recipe.get_objects_to_seek()
             # if objects_to_seek:

@@ -28,9 +28,10 @@ class RecipeNode:
 
 class Recipe:
 
-    def __init__(self, root_node: RecipeNode):
+    def __init__(self, root_node: RecipeNode, num_goals: int):
         self.root_node = root_node
         self.node_list = [root_node] + self.expand_child_nodes(root_node)
+        self.goal_encoding = self.goals_completed(num_goals)
 
     def goals_completed(self, num_goals):
         goals = np.zeros(num_goals, dtype=np.int32)
