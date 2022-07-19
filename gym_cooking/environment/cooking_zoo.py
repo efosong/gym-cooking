@@ -259,9 +259,8 @@ class CookingEnvironment(AECEnv):
         for agent in self.agents:
             self.current_tensor_observation[agent] = self.get_tensor_representation(agent)
 
-        info = {"t": self.t, "terminated": self.terminated, "truncated": self.truncated}
-
         done, rewards, goals = self.compute_rewards()
+        info = {"t": self.t, "terminated": self.terminated, "truncated": self.truncated}
         for idx, agent in enumerate(self.agents):
             self.dones[agent] = done
             self.rewards[agent] = rewards[idx]
