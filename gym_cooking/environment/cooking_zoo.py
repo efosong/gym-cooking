@@ -278,9 +278,10 @@ class CookingEnvironment(AECEnv):
                     features[1] = features[1] / self.world.height
                 feature_vector.extend(features)
         for idx in range(self.ghost_agents):
-            features = self.world_agent_mapping[agent]
+            features = self.world_agent_mapping[agent].feature_vector_representation()
             features[0] = 0
             features[1] = 0
+            feature_vector.extend(features)
 
         return np.array(feature_vector)
 
