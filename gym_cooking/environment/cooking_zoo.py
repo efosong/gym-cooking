@@ -15,12 +15,11 @@ from pettingzoo.utils.conversions import parallel_wrapper_fn
 
 import gym
 
-
 CollisionRepr = namedtuple("CollisionRepr", "time agent_names agent_locations")
 COLORS = ['blue', 'magenta', 'yellow', 'green']
 
 
-def env(level, num_agents, record, max_steps, recipes, obs_spaces=None, action_scheme="scheme1"):
+def env(level, num_agents, record, max_steps, recipes, obs_spaces=None, action_scheme="scheme1", ghost_agents=0):
     """
     The env function wraps the environment in 3 wrappers by default. These
     wrappers contain logic that is common to many pettingzoo environments.
@@ -29,7 +28,7 @@ def env(level, num_agents, record, max_steps, recipes, obs_spaces=None, action_s
     elsewhere in the developer documentation.
     """
     env_init = CookingEnvironment(level, num_agents, record, max_steps, recipes, obs_spaces,
-                                  action_scheme=action_scheme)
+                                  action_scheme=action_scheme, ghost_agents=ghost_agents)
     env_init = wrappers.CaptureStdoutWrapper(env_init)
     env_init = wrappers.AssertOutOfBoundsWrapper(env_init)
     env_init = wrappers.OrderEnforcingWrapper(env_init)
@@ -47,7 +46,7 @@ class CookingEnvironment(AECEnv):
     action_scheme_map = {"scheme1": ActionScheme1, "scheme2": ActionScheme2, "scheme3": ActionScheme3}
 
     def __init__(self, level, num_agents, record, max_steps, recipes, obs_spaces=None, allowed_objects=None,
-                 action_scheme="scheme1"):
+                 action_scheme="scheme1", ghost_agents=0):
         super().__init__()
 
         obs_spaces = obs_spaces or ["numeric"]
@@ -72,15 +71,17 @@ class CookingEnvironment(AECEnv):
         self.recipes = recipes
         self.game = None
         self.recipe_graphs = [RECIPES[recipe]() for recipe in recipes]
+        self.ghost_agents = ghost_agents
 
         self.termination_info = ""
         self.world.load_level(level=self.level, num_agents=num_agents)
         self.graph_representation_length = sum([cls.state_length() for cls in GAME_CLASSES])
-        objects = {}
+        objects = defaultdict(list)
         objects.update(self.world.world_objects)
         objects["Agent"] = self.world.agents
-        self.feature_vector_representation_length = sum([obj.feature_vector_length() for cls in GAME_CLASSES
-                                                         for obj in objects[ClassToString[cls]]])
+        feat_vec_l = sum([obj.feature_vector_length() for cls in GAME_CLASSES for obj in objects[ClassToString[cls]]])
+        agent_feature_length = StringToClass["Agent"].feature_vector_length()
+        self.feature_vector_representation_length = feat_vec_l + (agent_feature_length * self.ghost_agents)
 
         numeric_obs_space = {'symbolic_observation': gym.spaces.Box(low=0, high=10,
                                                                     shape=(self.world.width, self.world.height,
@@ -239,7 +240,7 @@ class CookingEnvironment(AECEnv):
 
             rewards[idx] -= (5 / self.max_steps)
 
-            # objects_to_seek = recipe.get_objects_to_seek()
+            objects_to_seek = recipe.get_objects_to_seek()
             # if objects_to_seek:
             #     distances = []
             #     for cls in objects_to_seek:
@@ -276,6 +277,11 @@ class CookingEnvironment(AECEnv):
                     features[0] = features[0] / self.world.width
                     features[1] = features[1] / self.world.height
                 feature_vector.extend(features)
+        for idx in range(self.ghost_agents):
+            features = self.world_agent_mapping[agent]
+            features[0] = 0
+            features[1] = 0
+
         return np.array(feature_vector)
 
     def get_tensor_representation(self):

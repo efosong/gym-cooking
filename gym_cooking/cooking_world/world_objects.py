@@ -257,10 +257,7 @@ class Onion(ChopFood):
         super().__init__(unique_id, location)
 
     def done(self):
-        if self.chop_state == ChopFoodStates.CHOPPED:
-            return True
-        else:
-            return False
+        return self.chop_state == ChopFoodStates.CHOPPED
 
     def numeric_state_representation(self):
         return 1, int(self.chop_state == ChopFoodStates.CHOPPED)
@@ -295,10 +292,7 @@ class Tomato(ChopFood):
         super().__init__(unique_id, location)
 
     def done(self):
-        if self.chop_state == ChopFoodStates.CHOPPED:
-            return True
-        else:
-            return False
+        return self.chop_state == ChopFoodStates.CHOPPED
 
     def numeric_state_representation(self):
         return 1, int(self.chop_state == ChopFoodStates.CHOPPED)
@@ -333,10 +327,7 @@ class Lettuce(ChopFood):
         super().__init__(unique_id, location)
 
     def done(self):
-        if self.chop_state == ChopFoodStates.CHOPPED:
-            return True
-        else:
-            return False
+        return self.chop_state == ChopFoodStates.CHOPPED
 
     def numeric_state_representation(self):
         return 1, int(self.chop_state == ChopFoodStates.CHOPPED)
@@ -363,6 +354,172 @@ class Lettuce(ChopFood):
 
     def display_text(self) -> str:
         return ""
+
+
+class Carrot(BlenderFood, ChopFood):
+
+    def __init__(self, unique_id, location):
+        super().__init__(unique_id, location)
+
+    def done(self):
+        return self.chop_state == ChopFoodStates.CHOPPED or self.blend_state == BlenderFoodStates.MASHED
+
+    def numeric_state_representation(self):
+        return 1, int(self.chop_state == ChopFoodStates.CHOPPED)
+
+    def feature_vector_representation(self):
+        return list(self.location) + [int(self.chop_state == ChopFoodStates.CHOPPED)]
+
+    @classmethod
+    def state_length(cls):
+        return 2
+
+    @classmethod
+    def feature_vector_length(cls):
+        return 3
+
+    def file_name(self) -> str:
+        if self.done():
+            if self.chop_state == ChopFoodStates.CHOPPED:
+                return "ChoppedCarrot"
+            elif self.blend_state == BlenderFoodStates.MASHED:
+                return "CarrotMashed"
+        else:
+            return "FreshCarrot"
+
+    def icons(self) -> List[str]:
+        return []
+
+    def display_text(self) -> str:
+        return ""
+
+
+class Cucumber(ChopFood):
+
+    def __init__(self, unique_id, location):
+        super().__init__(unique_id, location)
+
+    def done(self):
+        return self.chop_state == ChopFoodStates.CHOPPED
+
+    def numeric_state_representation(self):
+        return 1, int(self.chop_state == ChopFoodStates.CHOPPED)
+
+    def feature_vector_representation(self):
+        return list(self.location) + [int(self.chop_state == ChopFoodStates.CHOPPED)]
+
+    @classmethod
+    def state_length(cls):
+        return 2
+
+    @classmethod
+    def feature_vector_length(cls):
+        return 3
+
+    def file_name(self) -> str:
+        return "default_dynamic"
+
+    def icons(self) -> List[str]:
+        return []
+
+    def display_text(self) -> str:
+        return "Cu " + str(self.chop_state.value[:3])
+
+
+class Banana(BlenderFood, ChopFood):
+
+    def __init__(self, unique_id, location):
+        super().__init__(unique_id, location)
+
+    def done(self):
+        return self.chop_state == ChopFoodStates.CHOPPED or self.blend_state == BlenderFoodStates.MASHED
+
+    def numeric_state_representation(self):
+        return 1, int(self.chop_state == ChopFoodStates.CHOPPED)
+
+    def feature_vector_representation(self):
+        return list(self.location) + [int(self.chop_state == ChopFoodStates.CHOPPED)]
+
+    @classmethod
+    def state_length(cls):
+        return 2
+
+    @classmethod
+    def feature_vector_length(cls):
+        return 3
+
+    def file_name(self) -> str:
+        return "default_dynamic"
+
+    def icons(self) -> List[str]:
+        return []
+
+    def display_text(self) -> str:
+        return f"BN {self.chop_state.value[:3]} {self.blend_state.value[:3]}"
+
+
+class Apple(BlenderFood, ChopFood):
+
+    def __init__(self, unique_id, location):
+        super().__init__(unique_id, location)
+
+    def done(self):
+        return self.chop_state == ChopFoodStates.CHOPPED or self.blend_state == BlenderFoodStates.MASHED
+
+    def numeric_state_representation(self):
+        return 1, int(self.chop_state == ChopFoodStates.CHOPPED)
+
+    def feature_vector_representation(self):
+        return list(self.location) + [int(self.chop_state == ChopFoodStates.CHOPPED)]
+
+    @classmethod
+    def state_length(cls):
+        return 2
+
+    @classmethod
+    def feature_vector_length(cls):
+        return 3
+
+    def file_name(self) -> str:
+        return "default_dynamic"
+
+    def icons(self) -> List[str]:
+        return []
+
+    def display_text(self) -> str:
+        return f"AP {self.chop_state.value[:3]} {self.blend_state.value[:3]}"
+
+
+class Watermelon(ChopFood):
+
+    def __init__(self, unique_id, location):
+        super().__init__(unique_id, location)
+
+    def done(self):
+        return self.chop_state == ChopFoodStates.CHOPPED
+
+    def numeric_state_representation(self):
+        return 1, int(self.chop_state == ChopFoodStates.CHOPPED)
+
+    def feature_vector_representation(self):
+        return list(self.location) + [int(self.chop_state == ChopFoodStates.CHOPPED)]
+
+    @classmethod
+    def state_length(cls):
+        return 2
+
+    @classmethod
+    def feature_vector_length(cls):
+        return 3
+
+    def file_name(self) -> str:
+        return "default_dynamic"
+
+    def icons(self) -> List[str]:
+        return []
+
+    def display_text(self) -> str:
+        return f"WM {self.chop_state.value[:3]}"
 
 
 class Agent(Object):
