@@ -32,6 +32,7 @@ def env(
     action_scheme="scheme1",
     ghost_agents=0,
     completion_reward_frac=0.2,
+    time_penalty=0.0,
     ):
     """
     The env function wraps the environment in 3 wrappers by default. These
@@ -50,6 +51,7 @@ def env(
         action_scheme=action_scheme,
         ghost_agents=ghost_agents,
         completion_reward_frac=completion_reward_frac,
+        time_penalty=time_penalty,
         )
     env_init = wrappers.AssertOutOfBoundsWrapper(env_init)
     env_init = wrappers.OrderEnforcingWrapper(env_init)
@@ -83,6 +85,7 @@ class CookingEnvironment(AECEnv):
             action_scheme="scheme1",
             ghost_agents=0,
             completion_reward_frac=0.2,
+            time_penalty=0.0,
         ):
 
         super().__init__()
@@ -114,6 +117,7 @@ class CookingEnvironment(AECEnv):
         self.terminated = False
         self.truncated = False
         self.completion_reward_frac = completion_reward_frac
+        self.time_penalty = time_penalty
         self.world.load_level(level=self.level, num_agents=num_agents)
         self.graph_representation_length = sum([cls.state_length() for cls in GAME_CLASSES])
         self.has_reset = True
@@ -306,6 +310,7 @@ class CookingEnvironment(AECEnv):
             n_completed_goals = sum(goals_before) - sum(open_goals[idx])
             rewards[idx] = ((1-self.completion_reward_frac)*n_completed_goals/len(recipe.node_list)
                             + self.completion_reward_frac*recipe.completed())
+            rewards[idx] -= self.time_penalty
 
             # objects_to_seek = recipe.get_objects_to_seek()
             # if objects_to_seek:
@@ -350,7 +355,6 @@ class CookingEnvironment(AECEnv):
             features[1] = 0
             feature_vector.extend(features)
 
-        print(len(feature_vector))
         return np.array(feature_vector)
 
     def get_tensor_representation(self, agent=None):
