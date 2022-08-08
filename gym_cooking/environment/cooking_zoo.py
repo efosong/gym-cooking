@@ -14,7 +14,6 @@ from pettingzoo.utils import agent_selector
 from pettingzoo.utils import wrappers
 from pettingzoo.utils.conversions import parallel_wrapper_fn
 
-import gym
 from gym.spaces import Discrete, Box, MultiBinary, Dict
 from gym.utils import colorize
 
@@ -28,7 +27,7 @@ def env(
         max_steps,
         recipes,
         obs_spaces,
-        action_scheme="scheme1",
+        action_scheme="full_action_scheme",
         ghost_agents=0,
         completion_reward_frac=0.2,
         time_penalty=0.0,
@@ -68,9 +67,9 @@ class CookingEnvironment(AECEnv):
         "name": "cooking_zoo",
         "is_parallelizable": True}
     action_scheme_map = {
-        "scheme1": ActionScheme1,
-        "scheme2": ActionScheme2,
-        "scheme3": ActionScheme3}
+        "full_action_scheme": FullActionScheme,
+        "ego_turn_scheme": EgoTurnScheme,
+        "simplified_cardinal_scheme": SimplifiedCardinalScheme}
 
     def __init__(
             self,
@@ -81,7 +80,7 @@ class CookingEnvironment(AECEnv):
             recipes,
             obs_spaces=["numeric"],
             allowed_objects=None,
-            action_scheme="scheme1",
+            action_scheme="full_action_scheme",
             ghost_agents=0,
             completion_reward_frac=0.2,
             time_penalty=0.0,

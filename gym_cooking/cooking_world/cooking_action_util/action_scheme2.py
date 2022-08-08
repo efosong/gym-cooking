@@ -6,7 +6,7 @@ def perform_agent_actions(world, agents, actions):
     for agent, action in zip(agents, actions):
         agent.interacts_with = []
         if action in world.action_scheme.WALK_ACTIONS:
-            if action in [ActionScheme2.TURN_LEFT, ActionScheme2.TURN_RIGHT]:
+            if action in [EgoTurnScheme.TURN_LEFT, EgoTurnScheme.TURN_RIGHT]:
                 agent.change_orientation(world.agent_turn_map[(agent.orientation, action)])
 
     cleaned_actions = world.check_inbounds(agents, actions)
@@ -24,7 +24,7 @@ def perform_agent_action(world, agent: Agent, action):
 
 
 def resolve_walking_action(world, agent: Agent, action):
-    if action == ActionScheme2.WALK:
+    if action == EgoTurnScheme.WALK:
         target_location = world.get_target_location_scheme2(agent)
     else:
         return

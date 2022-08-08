@@ -1,5 +1,5 @@
 
-class ActionScheme1:
+class FullActionScheme:
 
     WALK_UP = 4
     WALK_DOWN = 3
@@ -17,7 +17,7 @@ class ActionScheme1:
     ACTIONS = [NO_OP, WALK_LEFT, WALK_RIGHT, WALK_DOWN, WALK_UP, INTERACT_PRIMARY, INTERACT_PICK_UP_SPECIAL, EXECUTE_ACTION]
 
 
-class ActionScheme2:
+class EgoTurnScheme:
 
     WALK = 3
     TURN_RIGHT = 2
@@ -36,7 +36,7 @@ class ActionScheme2:
                EXECUTE_ACTION]
 
 
-class ActionScheme3:
+class SimplifiedCardinalScheme:
 
     WALK_UP = 4
     WALK_DOWN = 3
@@ -53,7 +53,7 @@ class ActionScheme3:
     ACTIONS = [NO_OP, WALK_LEFT, WALK_RIGHT, WALK_DOWN, WALK_UP, INTERACT_PRIMARY, EXECUTE_ACTION]
 
 
-class ActionScheme4:
+class MoveOnlySet:
 
     WALK_UP = 4
     WALK_DOWN = 3

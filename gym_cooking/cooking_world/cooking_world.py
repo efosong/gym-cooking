@@ -19,10 +19,10 @@ class CookingWorld:
     DOWN = 3
     UP = 4
 
-    agent_turn_map = {(LEFT, ActionScheme2.TURN_LEFT): DOWN, (RIGHT, ActionScheme2.TURN_LEFT): UP,
-                      (UP, ActionScheme2.TURN_LEFT): LEFT, (DOWN, ActionScheme2.TURN_LEFT): RIGHT,
-                      (RIGHT, ActionScheme2.TURN_RIGHT): DOWN, (LEFT, ActionScheme2.TURN_RIGHT): UP,
-                      (UP, ActionScheme2.TURN_RIGHT): RIGHT, (DOWN, ActionScheme2.TURN_RIGHT): LEFT}
+    agent_turn_map = {(LEFT, EgoTurnScheme.TURN_LEFT): DOWN, (RIGHT, EgoTurnScheme.TURN_LEFT): UP,
+                      (UP, EgoTurnScheme.TURN_LEFT): LEFT, (DOWN, EgoTurnScheme.TURN_LEFT): RIGHT,
+                      (RIGHT, EgoTurnScheme.TURN_RIGHT): DOWN, (LEFT, EgoTurnScheme.TURN_RIGHT): UP,
+                      (UP, EgoTurnScheme.TURN_RIGHT): RIGHT, (DOWN, EgoTurnScheme.TURN_RIGHT): LEFT}
 
     COLORS = ['blue', 'magenta', 'yellow', 'green']
 
@@ -40,7 +40,7 @@ class CookingWorld:
 
     # AGENT_ACTIONS: 0: Noop, 1: Left, 2: right, 3: down, 4: up, 5: interact
 
-    def __init__(self, action_scheme_class=ActionScheme1, seed=0):
+    def __init__(self, action_scheme_class=FullActionScheme, seed=0):
         self.agents = []
         self.width = 0
         self.height = 0
@@ -100,11 +100,11 @@ class CookingWorld:
                     obj.content[-1].free = True
 
     def perform_agent_actions(self, agents, actions):
-        if self.action_scheme == ActionScheme1:
+        if self.action_scheme == FullActionScheme:
             action_scheme1.perform_agent_actions(self, agents, actions)
-        elif self.action_scheme == ActionScheme2:
+        elif self.action_scheme == EgoTurnScheme:
             action_scheme2.perform_agent_actions(self, agents, actions)
-        elif self.action_scheme == ActionScheme3:
+        elif self.action_scheme == SimplifiedCardinalScheme:
             action_scheme3.perform_agent_actions(self, agents, actions)
         else:
             raise Exception("No valid Action Scheme Found")
