@@ -1,6 +1,7 @@
 import os
 from gym_cooking.environment.game import graphic_pipeline
 from gym_cooking.misc.game.utils import *
+from gym_cooking.cooking_world.actions import *
 
 import pygame
 
@@ -15,9 +16,13 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = 'hide'
 
 class Game:
 
+    action_scheme_to_human_key_map = {ActionScheme1: KeyToTuple_human1, ActionScheme2: KeyToTuple_Scheme2_human1,
+                                      ActionScheme3: KeyToTuple_human1}
+
     def __init__(self, env, num_humans, ai_policies, max_steps=100, render=False):
         self._running = True
         self.env = env
+        self.key_to_action = self.action_scheme_to_human_key_map[env.unwrapped.world.action_scheme]
         self.play = bool(num_humans)
         self.render = render or self.play
         # Visual parameters
@@ -58,9 +63,9 @@ class Game:
                 return
 
             # Control current human agent
-            if event.key in KeyToTuple_human1 and self.num_humans > 0:
+            if event.key in self.key_to_action and self.num_humans > 0:
                 store_action_dict = {}
-                action = KeyToTuple_human1[event.key]
+                action = self.key_to_action[event.key]
                 self.env.unwrapped.world.agents[0].action = action
                 store_action_dict[self.env.unwrapped.world.agents[0]] = action
                 self.store["observation"].append(self.last_obs)
@@ -99,7 +104,7 @@ class Game:
         self.store["agent_states"].append([agent.location for agent in self.env.unwrapped.world.agents])
         for idx, agent in enumerate(self.env.unwrapped.world.agents):
             if idx >= self.num_humans:
-                ai_policy = self.ai_policies[idx - self.num_humans].agent
+                ai_policy = self.ai_policies[idx - self.num_humans]
                 env_agent = self.env.unwrapped.world_agent_to_env_agent_mapping[agent]
                 last_obs_raw = self.last_obs[env_agent]
                 ai_action = ai_policy.get_action(last_obs_raw)
@@ -108,16 +113,22 @@ class Game:
 
         self.yielding_action_dict = {agent: self.env.unwrapped.world_agent_mapping[agent].action
                                      for agent in self.env.agents}
-        observations, rewards, dones, infos = self.env.step(self.yielding_action_dict)
 
-        self.store["actions"].append(store_action_dict)
-        self.store["info"].append(infos)
-        self.store["rewards"].append(rewards)
-        self.store["done"].append(dones)
-        self.last_obs = observations
-        self.step_done = True
+        # -1 used as stop_game action, agent can end the episode
+        if not -1 in self.yielding_action_dict.values():
+            observations, rewards, dones, infos = self.env.step(self.yielding_action_dict)
 
-        if all(dones.values()):
+            self.store["actions"].append(store_action_dict)
+            self.store["info"].append(infos)
+            self.store["rewards"].append(rewards)
+            self.store["done"].append(dones)
+            self.last_obs = observations
+            self.step_done = True
+
+            if all(dones.values()):
+                self._running = False
+                self.store["observation"].append(self.last_obs)
+        else:
             self._running = False
             self.store["observation"].append(self.last_obs)
 
@@ -145,11 +156,11 @@ class Game:
                       self.store["rewards"][-1], self.yielding_action_dict
         self.on_cleanup()
 
-    def on_execute_ai_only_with_delay(self):
+    def on_execute_ai_only_with_delay(self, delay=0.2):
         self._running = self.on_init()
 
         while self._running:
-            sleep(0.2)
+            sleep(delay)
             self.ai_only_event()
             self.on_render()
         self.on_cleanup()

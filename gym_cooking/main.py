@@ -1,13 +1,13 @@
 import gym
 
-level = "open_room_blender"
+level = 'open_room_salad2'
 seed = 1
 record = False
-max_steps = 100
-recipe = "MashedCarrot"
+max_steps = 1000
+recipe = "TomatoSalad"
 
 env = gym.envs.make("gym_cooking:cookingEnv-v1", level=level, record=record, max_steps=max_steps, recipe=recipe,
-                    obs_spaces=["symbolic", "numeric"])
+                    obs_spaces=["feature_vector"])
 
 obs = env.reset()
 

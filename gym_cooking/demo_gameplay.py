@@ -8,16 +8,16 @@ num_humans = 1
 max_steps = 100
 render = False
 
-level = 'open_room_blender'
+level = 'split_room'
 seed = 1
 record = False
-max_num_timesteps = 100
+max_num_timesteps = 1000
 recipes = ["TomatoSalad"]
 
 parallel_env = cooking_zoo.parallel_env(level=level, num_agents=n_agents, record=record,
-                                        max_steps=max_num_timesteps, recipes=recipes, obs_spaces=["numeric"])
+                                        max_steps=max_num_timesteps, recipes=recipes, action_scheme="scheme3")
 
-game = Game(parallel_env, num_humans, [], max_steps)
+game = Game(parallel_env, num_humans, [], max_num_timesteps)
 store = game.on_execute()
 
 print("done")

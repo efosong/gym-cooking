@@ -19,7 +19,7 @@ parallel_env = cooking_zoo.parallel_env(
     record=record,
     max_steps=max_num_timesteps,
     recipes=recipes,
-    obs_spaces=["simple"],
+    obs_spaces=["feature_vector"],
     completion_reward_frac=0.5,
     )
 

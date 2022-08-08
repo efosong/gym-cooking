@@ -4,6 +4,7 @@ import functools
 
 from gym_cooking.cooking_world.cooking_world import CookingWorld
 from gym_cooking.cooking_world.world_objects import *
+from gym_cooking.cooking_world.actions import *
 from gym_cooking.cooking_book.recipe_drawer import RECIPES, NUM_GOALS
 
 import numpy as np
@@ -17,7 +18,6 @@ import gym
 from gym.spaces import Discrete, Box, MultiBinary, Dict
 from gym.utils import colorize
 
-
 CollisionRepr = namedtuple("CollisionRepr", "time agent_names agent_locations")
 COLORS = ['blue', 'magenta', 'yellow', 'green']
 
@@ -29,7 +29,10 @@ def env(
     max_steps,
     recipes,
     obs_spaces,
-    completion_reward_frac=0.2):
+    action_scheme="scheme1",
+    ghost_agents=0,
+    completion_reward_frac=0.2,
+    ):
     """
     The env function wraps the environment in 3 wrappers by default. These
     wrappers contain logic that is common to many pettingzoo environments.
@@ -44,6 +47,8 @@ def env(
         max_steps=max_steps,
         recipes=recipes,
         obs_spaces=obs_spaces,
+        action_scheme=action_scheme,
+        ghost_agents=ghost_agents,
         completion_reward_frac=completion_reward_frac,
         )
     env_init = wrappers.AssertOutOfBoundsWrapper(env_init)
@@ -61,6 +66,10 @@ class CookingEnvironment(AECEnv):
         "render_modes": ["human", "ansi"],
         "name": "cooking_zoo",
         "is_parallelizable": True}
+    action_scheme_map = {
+        "scheme1": ActionScheme1,
+        "scheme2": ActionScheme2,
+        "scheme3": ActionScheme3}
 
     def __init__(
             self,
@@ -71,12 +80,17 @@ class CookingEnvironment(AECEnv):
             recipes,
             obs_spaces=["numeric"],
             allowed_objects=None,
+            action_scheme="scheme1",
+            ghost_agents=0,
             completion_reward_frac=0.2,
         ):
-        super().__init__()
 
-        self.allowed_obs_spaces = ["symbolic", "numeric", "simple"]
-        assert len(set(obs_spaces + self.allowed_obs_spaces)) == 3, \
+        super().__init__()
+        obs_spaces = obs_spaces or ["numeric"]
+        self.allowed_obs_spaces = ["symbolic", "numeric", "numeric_main", "feature_vector"]
+        self.action_scheme = action_scheme
+        self.action_scheme_class = self.action_scheme_map[self.action_scheme]
+        assert len(set(obs_spaces + self.allowed_obs_spaces)) == 4, \
             f"Selected invalid obs spaces. Allowed {self.allowed_obs_spaces}"
         assert len(obs_spaces) != 0, f"Please select an observation space from: {self.allowed_obs_spaces}"
         self.obs_spaces = obs_spaces
@@ -90,17 +104,18 @@ class CookingEnvironment(AECEnv):
         self.t = 0
         self.filename = ""
         self.set_filename()
-        self.world = CookingWorld()
+        self.world = CookingWorld(self.action_scheme_class)
         self.seed()
         self.recipes = recipes
         self.game = None
         self.recipe_graphs = [RECIPES[recipe]() for recipe in recipes]
-        self.completion_reward_frac = completion_reward_frac
+        self.ghost_agents = ghost_agents
 
         self.terminated = False
         self.truncated = False
+        self.completion_reward_frac = completion_reward_frac
         self.world.load_level(level=self.level, num_agents=num_agents)
-        self.graph_representation_length = sum([tup[1] for tup in GAME_CLASSES_STATE_LENGTH]) + self.num_agents
+        self.graph_representation_length = sum([cls.state_length() for cls in GAME_CLASSES])
         self.has_reset = True
 
         self.recipe_mapping = dict(zip(self.possible_agents, self.recipe_graphs))
@@ -124,41 +139,30 @@ class CookingEnvironment(AECEnv):
 
     @functools.lru_cache(maxsize=None)
     def observation_space(self, agent):
-        numeric_obs_space = {
-            'symbolic_observation': Box(low=0,
-                                        high=10,
-                                        shape=(self.world.width, 
-                                               self.world.height,
-                                               self.graph_representation_length),
-                                        dtype=np.int32
-                                        ),
-             'agent_location': Box(low=0,
-                                   high=max(self.world.width, 
-                                            self.world.height),
-                                    shape=(2,)
-                                    ),
-             'goal_vector': MultiBinary(NUM_GOALS)
-             }
-        # TODO I don't really understand what the old code (above) was doing (in what sense is this
-        # the observation space of functions returned by the 'observe' function?)
-        # Simple obs space
-        simple_high = np.array([
-            self.world.width, self.world.height, # cut_board_loc,
-            self.world.width, self.world.height, # deliver_square_loc,
-            self.world.width, self.world.height, # plate_loc,
-            self.world.width, self.world.height, # tomato_loc,
-            self.world.width, self.world.height, # chopped_tomato_loc,
-            *[self.world.width, self.world.height, 1, 1, 1, 1] * len(self.possible_agents)
-            ])
-        simple_obs_space = Box(
-            low=-1,
-            high=simple_high,
-            shape=(10+6*len(self.possible_agents),)
-            )
-        if self.obs_spaces[0] == "simple":
-            return simple_obs_space
-        else:
-            return Dict(numeric_obs_space)
+        objects = defaultdict(list)
+        objects.update(self.world.world_objects)
+        objects["Agent"] = self.world.agents
+        feat_vec_l = sum([obj.feature_vector_length() for cls in GAME_CLASSES for obj in objects[ClassToString[cls]]])
+        agent_feature_length = StringToClass["Agent"].feature_vector_length()
+        self.feature_vector_representation_length = feat_vec_l + (agent_feature_length * self.ghost_agents)
+
+        numeric_obs_space = {'symbolic_observation': gym.spaces.Box(low=0, high=10,
+                                                                    shape=(self.world.width, self.world.height,
+                                                                           self.graph_representation_length),
+                                                                    dtype=np.int32),
+                             'agent_location': gym.spaces.Box(low=0, high=max(self.world.width, self.world.height),
+                                                              shape=(2,)),
+                             'goal_vector': gym.spaces.MultiBinary(NUM_GOALS)}
+        self.feature_obs_space = gym.spaces.Box(low=-1, high=1,
+                                                shape=(self.feature_vector_representation_length,))
+        self.numeric_main_obs_space = gym.spaces.Box(low=0, high=10, shape=(self.world.width, self.world.height,
+                                                                            self.graph_representation_length))
+        obs_space_dict = {
+            "numeric": numeric_obs_space,
+            "numeric_main": self.numeric_main_obs_space,
+            "feature_vector": self.feature_obs_space,
+            }
+        return obs_space_dict[self.obs_spaces[0]]
 
     @property
     def observation_spaces(self):
@@ -168,7 +172,7 @@ class CookingEnvironment(AECEnv):
 
     @functools.lru_cache(maxsize=None)
     def action_space(self, agent):
-        return gym.spaces.Discrete(6)
+        return gym.spaces.Discrete(len(self.action_scheme_class.ACTIONS))
 
     @property
     def action_spaces(self):
@@ -182,7 +186,7 @@ class CookingEnvironment(AECEnv):
         pass
 
     def reset(self, seed=None, return_info=False, options=None):
-        self.world = CookingWorld()
+        self.world = CookingWorld(self.action_scheme_class)
         self.seed(seed)
         self.t = 0
 
@@ -279,9 +283,10 @@ class CookingEnvironment(AECEnv):
             objects["Agent"] = self.world.agents
             sym_observation = copy.deepcopy(objects)
             observation.append(sym_observation)
-        if "simple" in self.obs_spaces:
-            simple_observation = self.get_simple_representation(agent)
-            observation.append(simple_observation)
+        if "numeric_main" in self.obs_spaces:
+            observation.append(self.current_tensor_observation)
+        if "feature_vector" in self.obs_spaces:
+            observation.append(self.get_feature_vector(agent))
         returned_observation = observation if not len(observation) == 1 else observation[0]
         return returned_observation
 
@@ -302,6 +307,22 @@ class CookingEnvironment(AECEnv):
             rewards[idx] = ((1-self.completion_reward_frac)*n_completed_goals/len(recipe.node_list)
                             + self.completion_reward_frac*recipe.completed())
 
+            # objects_to_seek = recipe.get_objects_to_seek()
+            # if objects_to_seek:
+            #     distances = []
+            #     for cls in objects_to_seek:
+            #         world_objects = self.world.world_objects[ClassToString[cls]]
+            #         min_distance = min([abs(self.world.agents[idx].location[0] - obj.location[0]) / self.world.height +
+            #                             abs(self.world.agents[idx].location[1] - obj.location[1]) / self.world.width
+            #                             for obj in world_objects])
+            #         distances.append(min_distance)
+            #
+            #     rewards[idx] -= min(distances)
+
+        # for idx, agent in enumerate(self.world.agents):
+        #     if not agent.interacts_with:
+        #         rewards[idx] -= 0.01
+
         if all((recipe.completed() for recipe in self.recipe_graphs)):
             self.terminated = True
             done = True
@@ -310,9 +331,9 @@ class CookingEnvironment(AECEnv):
     def get_simple_representation(self, agent):
         # NB: only works when there's one of each object!
         # cutting board location
-        cut_board_loc = self.world.world_objects["CutBoard"][0].location
+        cut_board_loc = self.world.world_objects["Cutboard"][0].location
         # deliver square location
-        deliver_square_loc = self.world.world_objects["DeliverSquare"][0].location
+        deliver_square_loc = self.world.world_objects["Deliversquare"][0].location
         # plate location
         plate_loc = self.world.world_objects["Plate"][0].location
         # tomato location
@@ -348,57 +369,43 @@ class CookingEnvironment(AECEnv):
             *other_agent_info
             ])
 
-
-    def get_tensor_representation(self, agent):
-        tensor = np.zeros(
-            (self.world.width, self.world.height, self.graph_representation_length + len(self.world.agents)))
+    def get_feature_vector(self, agent):
+        feature_vector = []
         objects = defaultdict(list)
         objects.update(self.world.world_objects)
-        idx = 0
-        for game_class in GAME_CLASSES:
-            if game_class is Agent:
-                continue
-            stateful_class = self.get_stateful_class(game_class)
-            if stateful_class:
-                n = 1
-                for obj in objects[ClassToString[game_class]]:
-                    # TODO carrot temp hack
-                    if game_class is Carrot:
-                        representation = [
-                            int(obj.chop_state != ChopFoodStates.CHOPPED),
-                            int(obj.chop_state == ChopFoodStates.CHOPPED),
-                            obj.current_progress
-                            ]
-                    else:
-                        representation = self.handle_stateful_class_representation(obj, stateful_class)
-                    n = len(representation)
-                    x, y = obj.location
-                    for i in range(n):
-                        tensor[x, y, idx + i] += representation[i]
-                idx += n
-            else:
-                for obj in objects[ClassToString[game_class]]:
-                    x, y = obj.location
-                    tensor[x, y, idx] += 1
-                idx += 1
-        ego_agent = self.world_agent_mapping[agent]
-        x, y = ego_agent.location
-        # location map for all agents, location maps for separate agent and four orientation maps shared
-        # between all agents
-        tensor[x, y, idx] = 1
-        tensor[x, y, idx + 1] = 1
-        tensor[x, y, idx + self.num_agents + ego_agent.orientation] = 1
+        objects["Agent"] = self.world.agents
+        x, y = self.world_agent_mapping[agent].location
+        for cls in GAME_CLASSES:
+            for obj in objects[ClassToString[cls]]:
+                features = list(obj.feature_vector_representation())
+                if features and obj is not self.world_agent_mapping[agent]:
+                    features[0] = (features[0] - x) / self.world.width
+                    features[1] = (features[1] - y) / self.world.height
+                if obj is self.world_agent_mapping[agent]:
+                    features[0] = features[0] / self.world.width
+                    features[1] = features[1] / self.world.height
+                feature_vector.extend(features)
+        for idx in range(self.ghost_agents):
+            features = self.world_agent_mapping[agent].feature_vector_representation()
+            features[0] = 0
+            features[1] = 0
+            feature_vector.extend(features)
 
-        agent_idx = 1
-        for world_agent in self.world.agents:
-            if agent != world_agent:
-                x, y = world_agent.location
-                # location map for all agents, location maps for separate agent and four orientation maps shared
-                # between all agents
-                tensor[x, y, idx] = 1
-                tensor[x, y, idx + agent_idx + 1] = 1
-                tensor[x, y, idx + self.num_agents + world_agent.orientation] = 1
-                agent_idx += 1
+        print(len(feature_vector))
+        return np.array(feature_vector)
+
+    def get_tensor_representation(self, agent=None):
+        tensor = np.zeros((self.world.width, self.world.height, self.graph_representation_length))
+        objects = defaultdict(list)
+        objects.update(self.world.world_objects)
+        objects["Agent"] = self.world.agents
+        state_idx = 0
+        for cls in GAME_CLASSES:
+            for obj in objects[ClassToString[cls]]:
+                x, y = obj.location
+                for idx, value in enumerate(obj.numeric_state_representation()):
+                    tensor[x, y, state_idx + idx] = value
+            state_idx += cls.state_length()
         return tensor
 
     def get_agent_names(self):
@@ -415,10 +422,10 @@ class CookingEnvironment(AECEnv):
         for counter in self.world.world_objects["Counter"]:
             x, y = counter.location
             grid[x, y] = colorize(" ", color="gray", highlight=True)
-        for cut_board in self.world.world_objects["CutBoard"]:
+        for cut_board in self.world.world_objects["Cutboard"]:
             x, y = cut_board.location
             grid[x, y] = colorize(" ", color="yellow", highlight=True)
-        for deliver_square in self.world.world_objects["DeliverSquare"]:
+        for deliver_square in self.world.world_objects["Deliversquare"]:
             x, y = deliver_square.location
             grid[x, y] = colorize(" ", color="cyan", highlight=True)
         # render counter items

@@ -1,37 +1,54 @@
+import copy
 from collections import defaultdict
 from gym_cooking.cooking_world.world_objects import *
 from gym.utils import seeding
+from gym_cooking.cooking_world.actions import *
+from gym_cooking.cooking_world.cooking_action_util import action_scheme1, action_scheme2, action_scheme3
 
 from pathlib import Path
 import os.path
 import json
 import random
+import itertools
 
 
 class CookingWorld:
+
+    LEFT = 1
+    RIGHT = 2
+    DOWN = 3
+    UP = 4
+
+    agent_turn_map = {(LEFT, ActionScheme2.TURN_LEFT): DOWN, (RIGHT, ActionScheme2.TURN_LEFT): UP,
+                      (UP, ActionScheme2.TURN_LEFT): LEFT, (DOWN, ActionScheme2.TURN_LEFT): RIGHT,
+                      (RIGHT, ActionScheme2.TURN_RIGHT): DOWN, (LEFT, ActionScheme2.TURN_RIGHT): UP,
+                      (UP, ActionScheme2.TURN_RIGHT): RIGHT, (DOWN, ActionScheme2.TURN_RIGHT): LEFT}
 
     COLORS = ['blue', 'magenta', 'yellow', 'green']
 
     SymbolToClass = {
         ' ': Floor,
         '-': Counter,
-        '/': CutBoard,
-        '*': DeliverSquare,
+        '/': Cutboard,
+        '*': Deliversquare,
         't': Tomato,
         'l': Lettuce,
         'o': Onion,
         'p': Plate,
-        'b': Blender
+        #'b': Blender,
     }
 
     # AGENT_ACTIONS: 0: Noop, 1: Left, 2: right, 3: down, 4: up, 5: interact
 
-    def __init__(self, seed=0):
+    def __init__(self, action_scheme_class=ActionScheme1, seed=0):
         self.agents = []
         self.width = 0
         self.height = 0
         self.world_objects = defaultdict(list)
         self.abstract_index = defaultdict(list)
+        self.id_counter = itertools.count(start=0, step=1)
+        self.action_scheme = action_scheme_class
+        self.init_world = None
         self.seed(seed)
 
     def seed(self, seed=None):
@@ -50,6 +67,19 @@ class CookingWorld:
                 if issubclass(StringToClass[type_name], abstract_class):
                     self.abstract_index[abstract_class].extend(obj_list)
 
+    def delete_from_index(self, obj):
+        for abstract_class in ABSTRACT_GAME_CLASSES:
+            if isinstance(obj, abstract_class):
+                try:
+                    self.abstract_index[abstract_class].remove(obj)
+                except ValueError:
+                    pass
+
+    def add_to_index(self, obj):
+        for abstract_class in ABSTRACT_GAME_CLASSES:
+            if isinstance(obj, abstract_class):
+                self.abstract_index[abstract_class].append(obj)
+
     def get_object_list(self):
         object_list = []
         for value in self.world_objects.values():
@@ -57,57 +87,93 @@ class CookingWorld:
         return object_list
 
     def progress_world(self):
+        for obj in self.abstract_index[ProcessingObject]:
+            obj.process()
         for obj in self.abstract_index[ProgressingObject]:
-            dynamic_objects = self.get_objects_at(obj.location, DynamicObject)
-            obj.progress(dynamic_objects)
+            obj.progress()
+        for obj in self.abstract_index[ContentObject]:
+            if len(obj.content) > 0:
+                for c in obj.content:
+                    if hasattr(c, "free"):
+                        c.free = False
+                if hasattr(obj.content[-1], 'free'):
+                    obj.content[-1].free = True
 
     def perform_agent_actions(self, agents, actions):
-        for agent, action in zip(agents, actions):
-            if 0 < action < 5:
-                agent.change_orientation(action)
-        cleaned_actions = self.check_inbounds(agents, actions)
-        collision_actions = self.check_collisions(agents, cleaned_actions)
-        for agent, action in zip(agents, collision_actions):
-            self.perform_agent_action(agent, action)
+        if self.action_scheme == ActionScheme1:
+            action_scheme1.perform_agent_actions(self, agents, actions)
+        elif self.action_scheme == ActionScheme2:
+            action_scheme2.perform_agent_actions(self, agents, actions)
+        elif self.action_scheme == ActionScheme3:
+            action_scheme3.perform_agent_actions(self, agents, actions)
+        else:
+            raise Exception("No valid Action Scheme Found")
         self.progress_world()
 
-    def perform_agent_action(self, agent: Agent, action):
-        if 0 < action < 5:
-            self.resolve_walking_action(agent, action)
-        if action == 5:
-            interaction_location = self.get_target_location(agent, agent.orientation)
-            if any([agent.location == interaction_location for agent in self.agents]):
-                return
-            dynamic_objects = self.get_objects_at(interaction_location, DynamicObject)
-            static_object = self.get_objects_at(interaction_location, StaticObject)[0]
-            if not agent.holding and not dynamic_objects:
-                return
-            elif agent.holding and not dynamic_objects:
-                if static_object.accepts([agent.holding]):
-                    agent.put_down(interaction_location)
-            elif not agent.holding and dynamic_objects:
-                object_to_grab = self.get_highest_order_object(dynamic_objects)
-                if isinstance(static_object, ActionObject):
-                    action_done = static_object.action(dynamic_objects)
-                    if not action_done:
-                        agent.grab(object_to_grab)
-                else:
+    def resolve_primary_interaction(self, agent: Agent):
+        interaction_location = self.get_target_location(agent, agent.orientation)
+        if any([agent.location == interaction_location for agent in self.agents]):
+            return
+        dynamic_objects = self.get_objects_at(interaction_location, DynamicObject)
+        static_object = self.get_objects_at(interaction_location, StaticObject)[0]
+
+        if not agent.holding and not dynamic_objects:
+            return
+        elif not agent.holding and dynamic_objects:
+            if static_object.releases():
+                # changed, to preserve content order when picking up again (LIFO)
+                object_to_grab = dynamic_objects[-1]
+                for obj in dynamic_objects:
+                    if hasattr(obj, "free") and obj.free:
+                        object_to_grab = obj
+                        break
+                # content_obj_l = self.filter_obj(dynamic_objects, ContentObject)
+                # pick_index = -1 #pick the last object put on
+                # if content_obj_l:
+                #     object_to_grab = content_obj_l[pick_index]
+                # else:
+                #     object_to_grab = dynamic_objects[pick_index]
+                if object_to_grab in static_object.content:
                     agent.grab(object_to_grab)
-            elif agent.holding and dynamic_objects:
-                self.attempt_merge(agent, dynamic_objects, interaction_location)
+                    static_object.content.remove(object_to_grab)
+                    agent.interacts_with = [object_to_grab]
+        elif agent.holding:
+            self.attempt_merge(agent, dynamic_objects, interaction_location, static_object)
 
-    def resolve_walking_action(self, agent: Agent, action):
-        target_location = self.get_target_location(agent, action)
-        if self.square_walkable(target_location):
-            agent.move_to(target_location)
+    def resolve_interaction_pick_up_special(self, agent: Agent):
+        interaction_location = self.get_target_location(agent, agent.orientation)
+        if any([agent.location == interaction_location for agent in self.agents]):
+            return
+        dynamic_objects = self.get_objects_at(interaction_location, DynamicObject)
+        if not agent.holding and dynamic_objects:
+            content_obj_l = self.filter_obj(dynamic_objects, ContentObject)
+            if len(content_obj_l) == 1:
+                try:
+                    obj = content_obj_l[0].content.pop(-1) #pick the last object put on
+                    agent.grab(obj)
+                except IndexError:
+                    pass
+            else:
+                return
+        else:
+            return
 
-    def get_highest_order_object(self, objects: List[DynamicObject]):
-        order = [Container, Food]
-        for obj_type in order:
-            obj = self.filter_obj(objects, obj_type)
-            if obj:
-                return obj
-        return None
+    def resolve_execute_action(self, agent: Agent):
+        interaction_location = self.get_target_location(agent, agent.orientation)
+        if any([agent.location == interaction_location for agent in self.agents]):
+            return
+        static_object = self.get_objects_at(interaction_location, StaticObject)[0]
+        if isinstance(static_object, ActionObject):
+            obj_list_created, obj_list_deleted, action_executed = static_object.action()
+            if action_executed:
+                agent.interacts_with = [static_object]
+            for del_obj in obj_list_deleted:
+                self.delete_object(del_obj)
+                self.delete_from_index(del_obj)
+            for new_obj in obj_list_created:
+                new_obj.unique_id = next(self.id_counter)
+                self.add_object(new_obj)
+                self.add_to_index(new_obj)
 
     @staticmethod
     def get_target_location(agent, action):
@@ -124,14 +190,21 @@ class CookingWorld:
         return target_location
 
     @staticmethod
-    def filter_obj(objects: List[DynamicObject], obj_type):
-        filtered_objects = [obj for obj in objects if isinstance(obj, obj_type)]
-        if len(filtered_objects) > 1:
-            raise Exception(f"Too many {obj_type} in one place!")
-        elif len(filtered_objects) == 1:
-            return filtered_objects[0]
+    def get_target_location_scheme2(agent):
+        if agent.orientation == 1:
+            target_location = (agent.location[0] - 1, agent.location[1])
+        elif agent.orientation == 2:
+            target_location = (agent.location[0] + 1, agent.location[1])
+        elif agent.orientation == 3:
+            target_location = (agent.location[0], agent.location[1] + 1)
+        elif agent.orientation == 4:
+            target_location = (agent.location[0], agent.location[1] - 1)
         else:
-            return None
+            target_location = (agent.location[0], agent.location[1])
+        return target_location
+
+    def filter_obj(self, objects: List, obj_type):
+        return [obj for obj in objects if isinstance(obj, obj_type)]
 
     def check_inbounds(self, agents, actions):
         cleaned_actions = []
@@ -182,20 +255,31 @@ class CookingWorld:
             for obj in objects:
                 if obj.location == location:
                     located_objects.append(obj)
+
         return located_objects
 
-    def attempt_merge(self, agent: Agent, dynamic_objects: List[DynamicObject], target_location):
-        highest_order_obj = self.get_highest_order_object(dynamic_objects)
-        if isinstance(highest_order_obj, Container) and isinstance(agent.holding, Food):
-            if agent.holding.done():
-                highest_order_obj.add_content(agent.holding)
+    def attempt_merge(self, agent: Agent, dynamic_objects: List[DynamicObject], target_location, static_object):
+        content_obj = self.filter_obj(dynamic_objects, ContentObject)
+        if content_obj and len(content_obj) == 1:
+            if content_obj[0].accepts(agent.holding):
+                content_obj[0].add_content(agent.holding)
                 agent.put_down(target_location)
-        if isinstance(highest_order_obj, Food) and isinstance(agent.holding, Container):
-            if highest_order_obj.done():
-                agent.holding.add_content(highest_order_obj)
-                highest_order_obj.move_to(agent.location)
+                agent.interacts_with.append(content_obj[0])
+        elif isinstance(agent.holding, ContentObject) and dynamic_objects:
+            pick_index = -1  # pick the last object put on
+            if agent.holding.accepts(dynamic_objects[pick_index]):
+                agent.holding.add_content(dynamic_objects[pick_index])
+                dynamic_objects[pick_index].move_to(agent.location)
+                agent.interacts_with.append(dynamic_objects[pick_index])
+                static_object.content.remove(dynamic_objects[pick_index])
+        elif isinstance(static_object, ContentObject):
+            if static_object.accepts(agent.holding):
+                static_object.add_content(agent.holding)
+                agent.put_down(target_location)
+                agent.interacts_with.append(static_object)
 
     def load_new_style_level(self, level_name, num_agents):
+        self.id_counter = itertools.count(start=0, step=1)
         my_path = os.path.realpath(__file__)
         dir_name = os.path.dirname(my_path)
         path = Path(dir_name)
@@ -215,10 +299,10 @@ class CookingWorld:
         for y, line in enumerate(iter(level_layout.splitlines())):
             for x, char in enumerate(line):
                 if char == "-":
-                    counter = Counter(location=(x, y))
+                    counter = Counter(unique_id=next(self.id_counter), location=(x, y))
                     self.add_object(counter)
                 else:
-                    floor = Floor(location=(x, y))
+                    floor = Floor(unique_id=next(self.id_counter), location=(x, y))
                     self.add_object(floor)
         self.width = x + 1
         self.height = y + 1
@@ -236,17 +320,17 @@ class CookingWorld:
                         raise ValueError(f"Position {x} {y} of object {name} is out of bounds set by the level layout!")
                     static_objects_loc = self.get_objects_at((x, y), StaticObject)
 
-                    counter = [obj for obj in static_objects_loc if isinstance(obj, (Counter, Floor))]
+                    counter = [obj for obj in static_objects_loc if isinstance(obj, Counter)]
                     if counter:
                         if len(counter) != 1:
                             raise ValueError("Too many counter in one place detected during initialization")
                         self.delete_object(counter[0])
-                        obj = StringToClass[name](location=(x, y))
+                        obj = StringToClass[name](unique_id=next(self.id_counter), location=(x, y))
                         self.add_object(obj)
                         break
                     else:
                         time_out += 1
-                        if time_out > 100:
+                        if time_out > 10000:
                             raise ValueError(f"Can't find valid position for object: "
                                              f"{static_object} in {time_out} steps")
                         continue
@@ -265,22 +349,15 @@ class CookingWorld:
                         raise ValueError(f"Position {x} {y} of object {name} is out of bounds set by the level layout!")
                     static_objects_loc = self.get_objects_at((x, y), Counter)
                     dynamic_objects_loc = self.get_objects_at((x, y), DynamicObject)
-                    plate_obj = [o for o in dynamic_objects_loc if isinstance(o, Plate)]
-                    if (len(static_objects_loc) == 1
-                            and (
-                                (len(plate_obj) == 1 and state == "CHOPPED")
-                                or len(dynamic_objects_loc) == 0)
-                            ):
-                        obj = StringToClass[name](location=(x, y))
-                        if state == "CHOPPED":
-                            obj.chop()
-                        if len(plate_obj) == 1:
-                            plate_obj[0].add_content(obj)
+
+                    if len(static_objects_loc) == 1 and not dynamic_objects_loc:
+                        obj = StringToClass[name](unique_id=next(self.id_counter), location=(x, y))
                         self.add_object(obj)
+                        static_objects_loc[0].add_content(obj)
                         break
                     else:
                         time_out += 1
-                        if time_out > 100:
+                        if time_out > 10000:
                             raise ValueError(f"Can't find valid position for object: "
                                              f"{dynamic_object} in {time_out} steps")
                         continue
@@ -301,15 +378,24 @@ class CookingWorld:
                         raise ValueError(f"Position {x} {y} of agent is out of bounds set by the level layout!")
                     static_objects_loc = self.get_objects_at((x, y), Floor)
                     if not any([(x, y) == agent.location for agent in self.agents]) and static_objects_loc:
-                        agent = Agent((int(x), int(y)), self.COLORS[len(self.agents)],
+                        agent = Agent(next(self.id_counter), (int(x), int(y)), self.COLORS[len(self.agents)],
                                       'agent-' + str(len(self.agents) + 1))
                         self.agents.append(agent)
+                        static_objects_loc[0].add_content(agent)
                         break
                     else:
                         time_out += 1
-                        if time_out > 100:
+                        if time_out > 1000:
                             raise ValueError(f"Can't find valid position for agent: {agent_object} in {time_out} steps")
 
     def load_level(self, level, num_agents):
-        self.load_new_style_level(level, num_agents)
+        if self.init_world is not None:
+            self.world_objects = defaultdict(list)
+            self.world_objects.update(copy.deepcopy(self.init_world))
+            self.agents = copy.deepcopy(self.init_agents)
+        else:
+            self.load_new_style_level(level, num_agents)
+            self.init_world = defaultdict(list)
+            self.init_world.update(copy.deepcopy(self.world_objects))
+            self.init_agents = copy.deepcopy(self.agents)
         self.index_objects()
