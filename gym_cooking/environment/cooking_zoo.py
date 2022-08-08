@@ -426,22 +426,3 @@ class CookingEnvironment(AECEnv):
                 symbol = symbols[agent.orientation-1]
                 grid[x, y] = grid[x, y].replace("O", symbol)
         return "\n".join(("".join(row) for row in grid)) + "\n"
-
-    @staticmethod
-    def get_stateful_class(game_class):
-        for stateful_class in STATEFUL_GAME_CLASSES:
-            if issubclass(game_class, stateful_class):
-                return stateful_class
-        return None
-
-    @staticmethod
-    def handle_stateful_class_representation(obj, stateful_class):
-        # TODO carrot is both, so really this logic isn't great.
-        if stateful_class is ChopFood:
-            return [
-                int(obj.chop_state != ChopFoodStates.CHOPPED),
-                int(obj.chop_state == ChopFoodStates.CHOPPED)
-                ]
-        if stateful_class is BlenderFood:
-            return [obj.current_progress]
-        raise ValueError(f"Could not process stateful class {stateful_class}")
