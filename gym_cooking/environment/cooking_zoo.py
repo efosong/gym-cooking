@@ -87,16 +87,23 @@ class CookingEnvironment(AECEnv):
         ):
 
         super().__init__()
-        obs_spaces = obs_spaces or ["numeric"]
-        self.allowed_obs_spaces = ["symbolic", "numeric", "numeric_main", "feature_vector"]
         self.action_scheme = action_scheme
         self.action_scheme_class = self.action_scheme_map[self.action_scheme]
-        assert len(set(obs_spaces + self.allowed_obs_spaces)) == 4, \
+        obs_spaces = obs_spaces or ["numeric"]
+        self.allowed_obs_spaces = set([
+            "symbolic",
+            "numeric",
+            "numeric_main",
+            "feature_vector",
+            "feature_vector_nc",  # Feature vector excluding counters
+            ])
+        assert set(obs_spaces).issubset(self.allowed_obs_spaces), \
             f"Selected invalid obs spaces. Allowed {self.allowed_obs_spaces}"
-        assert len(obs_spaces) != 0, f"Please select an observation space from: {self.allowed_obs_spaces}"
+        assert len(obs_spaces) > 0, \
+            f"Please select an observation space from: {self.allowed_obs_spaces}"
         self.obs_spaces = obs_spaces
         self.allowed_objects = allowed_objects or []
-        self.possible_agents = ["player_" + str(r) for r in range(num_agents)]
+        self.possible_agents = [f"player_{r}" for r in range(num_agents)]
         self.agents = self.possible_agents[:]
 
         self.level = level
@@ -144,9 +151,24 @@ class CookingEnvironment(AECEnv):
         objects = defaultdict(list)
         objects.update(self.world.world_objects)
         objects["Agent"] = self.world.agents
-        feat_vec_l = sum([obj.feature_vector_length() for cls in GAME_CLASSES for obj in objects[ClassToString[cls]]])
-        agent_feature_length = StringToClass["Agent"].feature_vector_length()
-        self.feature_vector_representation_length = feat_vec_l + (agent_feature_length * self.ghost_agents)
+
+        feature_vec_len = sum(
+            [obj.feature_vector_length()
+             for cls in GAME_CLASSES
+             for obj in objects[ClassToString[cls]]
+             ]
+            )
+        ghost_agent_feature_vec_len = self.ghost_agents * StringToClass["Agent"].feature_vector_length()
+        feature_vec_len += ghost_agent_feature_vec_len
+
+        feature_vec_nc_len = sum(
+            [obj.feature_vector_length()
+             for cls in GAME_CLASSES
+             for obj in objects[ClassToString[cls]]
+             if ClassToString[cls] != "Counter"
+             ]
+            )
+        feature_vec_nc_len += ghost_agent_feature_vec_len
 
         numeric_obs_space = {
             'symbolic_observation': Box(low=0, high=10,
@@ -157,15 +179,18 @@ class CookingEnvironment(AECEnv):
                                              shape=(2,)),
             'goal_vector': MultiBinary(NUM_GOALS)
         }
-        self.feature_obs_space = Box(low=-1, high=1,
-                                                shape=(self.feature_vector_representation_length,))
-        self.numeric_main_obs_space = Box(low=0, high=10,
-                                                     shape=(self.world.width, self.world.height,
-                                                            self.graph_representation_length))
+        feature_vec_obs_space = Box(low=-1, high=1,
+                                    shape=(feature_vec_len,))
+        feature_vec_nc_obs_space = Box(low=-1, high=1,
+                                       shape=(feature_vec_nc_len,))
+        numeric_main_obs_space = Box(low=0, high=10,
+                                     shape=(self.world.width, self.world.height,
+                                            self.graph_representation_length))
         obs_space_dict = {
             "numeric": numeric_obs_space,
-            "numeric_main": self.numeric_main_obs_space,
-            "feature_vector": self.feature_obs_space,
+            "numeric_main": numeric_main_obs_space,
+            "feature_vector": feature_vec_obs_space,
+            "feature_vector_nc": feature_vec_nc_obs_space,
             }
         return obs_space_dict[self.obs_spaces[0]]
 
@@ -274,7 +299,9 @@ class CookingEnvironment(AECEnv):
         if "numeric_main" in self.obs_spaces:
             observation.append(self.current_tensor_observation)
         if "feature_vector" in self.obs_spaces:
-            observation.append(self.get_feature_vector(agent))
+            observation.append(self.get_feature_vector(agent, ignore=[]))
+        if "feature_vector_nc" in self.obs_spaces:
+            observation.append(self.get_feature_vector(agent, ignore=["Counter"]))
         returned_observation = observation if not len(observation) == 1 else observation[0]
         return returned_observation
 
@@ -317,13 +344,15 @@ class CookingEnvironment(AECEnv):
             done = True
         return done, rewards, open_goals
 
-    def get_feature_vector(self, agent):
+    def get_feature_vector(self, agent, ignore=[]):
         feature_vector = []
         objects = defaultdict(list)
         objects.update(self.world.world_objects)
         objects["Agent"] = self.world.agents
         x, y = self.world_agent_mapping[agent].location
         for cls in GAME_CLASSES:
+            if ClassToString[cls] in ignore:
+                continue
             for obj in objects[ClassToString[cls]]:
                 features = list(obj.feature_vector_representation())
                 if features and obj is not self.world_agent_mapping[agent]:
