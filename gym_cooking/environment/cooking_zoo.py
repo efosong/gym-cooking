@@ -18,21 +18,20 @@ import gym
 from gym.spaces import Discrete, Box, MultiBinary, Dict
 from gym.utils import colorize
 
-CollisionRepr = namedtuple("CollisionRepr", "time agent_names agent_locations")
 COLORS = ['blue', 'magenta', 'yellow', 'green']
 
 
 def env(
-    level,
-    num_agents,
-    record,
-    max_steps,
-    recipes,
-    obs_spaces,
-    action_scheme="scheme1",
-    ghost_agents=0,
-    completion_reward_frac=0.2,
-    time_penalty=0.0,
+        level,
+        num_agents,
+        record,
+        max_steps,
+        recipes,
+        obs_spaces,
+        action_scheme="scheme1",
+        ghost_agents=0,
+        completion_reward_frac=0.2,
+        time_penalty=0.0,
     ):
     """
     The env function wraps the environment in 3 wrappers by default. These
@@ -150,17 +149,20 @@ class CookingEnvironment(AECEnv):
         agent_feature_length = StringToClass["Agent"].feature_vector_length()
         self.feature_vector_representation_length = feat_vec_l + (agent_feature_length * self.ghost_agents)
 
-        numeric_obs_space = {'symbolic_observation': gym.spaces.Box(low=0, high=10,
-                                                                    shape=(self.world.width, self.world.height,
-                                                                           self.graph_representation_length),
-                                                                    dtype=np.int32),
-                             'agent_location': gym.spaces.Box(low=0, high=max(self.world.width, self.world.height),
-                                                              shape=(2,)),
-                             'goal_vector': gym.spaces.MultiBinary(NUM_GOALS)}
-        self.feature_obs_space = gym.spaces.Box(low=-1, high=1,
+        numeric_obs_space = {
+            'symbolic_observation': Box(low=0, high=10,
+                                                   shape=(self.world.width, self.world.height,
+                                                          self.graph_representation_length),
+                                                   dtype=np.int32),
+            'agent_location': Box(low=0, high=max(self.world.width, self.world.height),
+                                             shape=(2,)),
+            'goal_vector': MultiBinary(NUM_GOALS)
+        }
+        self.feature_obs_space = Box(low=-1, high=1,
                                                 shape=(self.feature_vector_representation_length,))
-        self.numeric_main_obs_space = gym.spaces.Box(low=0, high=10, shape=(self.world.width, self.world.height,
-                                                                            self.graph_representation_length))
+        self.numeric_main_obs_space = Box(low=0, high=10,
+                                                     shape=(self.world.width, self.world.height,
+                                                            self.graph_representation_length))
         obs_space_dict = {
             "numeric": numeric_obs_space,
             "numeric_main": self.numeric_main_obs_space,
@@ -176,7 +178,7 @@ class CookingEnvironment(AECEnv):
 
     @functools.lru_cache(maxsize=None)
     def action_space(self, agent):
-        return gym.spaces.Discrete(len(self.action_scheme_class.ACTIONS))
+        return Discrete(len(self.action_scheme_class.ACTIONS))
 
     @property
     def action_spaces(self):
@@ -203,16 +205,6 @@ class CookingEnvironment(AECEnv):
 
         for recipe in self.recipe_graphs:
             recipe.update_recipe_state(self.world)
-
-        # if self.record:
-        #     self.game = GameImage(
-        #         filename=self.filename,
-        #         world=self.world,
-        #         record=self.record)
-        #     self.game.on_init()
-        #     self.game.save_image_obs(self.t)
-        # else:
-        #     self.game = None
 
         self.agents = self.possible_agents[:]
         self._agent_selector.reinit(self.agents)
@@ -254,13 +246,6 @@ class CookingEnvironment(AECEnv):
         self.t += 1
         # translated_actions = [action_translation_dict[actions[f"player_{idx}"]] for idx in range(len(actions))]
         self.world.perform_agent_actions(self.world.agents, actions)
-
-        # Visualize.
-        if self.record:
-            self.game.on_render()
-
-        if self.record:
-            self.game.save_image_obs(self.t)
 
         # Get an image observation
         # image_obs = self.game.get_image_obs()
