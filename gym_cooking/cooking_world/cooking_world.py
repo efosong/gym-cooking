@@ -3,6 +3,7 @@ from collections import defaultdict
 from gym_cooking.cooking_world.world_objects import *
 from gym.utils import seeding
 from gym_cooking.cooking_world.actions import *
+from gym_cooking.cooking_world.constants import *
 from gym_cooking.cooking_world.cooking_action_util import action_scheme1, action_scheme2, action_scheme3
 
 from pathlib import Path
@@ -25,20 +26,6 @@ class CookingWorld:
                       (UP, EgoTurnScheme.TURN_RIGHT): RIGHT, (DOWN, EgoTurnScheme.TURN_RIGHT): LEFT}
 
     COLORS = ['blue', 'magenta', 'yellow', 'green']
-
-    SymbolToClass = {
-        ' ': Floor,
-        '-': Counter,
-        '/': Cutboard,
-        '*': Deliversquare,
-        't': Tomato,
-        'l': Lettuce,
-        'o': Onion,
-        'p': Plate,
-        #'b': Blender,
-    }
-
-    # AGENT_ACTIONS: 0: Noop, 1: Left, 2: right, 3: down, 4: up, 5: interact
 
     def __init__(self, action_scheme_class=FullActionScheme, seed=0):
         self.agents = []
@@ -335,6 +322,27 @@ class CookingWorld:
                                              f"{static_object} in {time_out} steps")
                         continue
 
+    def parse_object_state(self, obj, state):
+        if state == "CHOPPED":
+            if hasattr(obj, "chop"):
+                obj.chop()
+        if state == "MASHED":
+            if hasattr(obj, "blend"):
+                while obj.blend_state != BlenderFoodStates.MASHED:
+                    obj.blend()
+        if state == "TOASTED":
+            if hasattr(obj, "toast"):
+                while obj.blend_state != ToasterFoodStates.TOASTED:
+                    obj.toast()
+        if state == "HOT":
+            if hasattr(obj, "microwave"):
+                while obj.blend_state != MicrowaveFoodStates.HOT:
+                    obj.microwave()
+        if state == "COOKED":
+            if hasattr(obj, "boil"):
+                while obj.blend_state != PotFoodStates.COOKED:
+                    obj.boil()
+
     def parse_dynamic_objects(self, level_object):
         dynamic_objects = level_object["DYNAMIC_OBJECTS"]
         for dynamic_object in dynamic_objects:
@@ -347,14 +355,18 @@ class CookingWorld:
                     state = dynamic_object[name].get("STATE", "")
                     if x < 0 or y < 0 or x > self.width or y > self.height:
                         raise ValueError(f"Position {x} {y} of object {name} is out of bounds set by the level layout!")
-                    static_objects_loc = self.get_objects_at((x, y), Counter)
-                    dynamic_objects_loc = self.get_objects_at((x, y), DynamicObject)
-
-                    if len(static_objects_loc) == 1 and not dynamic_objects_loc:
+                    content_objects_loc = self.get_objects_at((x, y), ContentObject)
+                    placed_current_obj = False
+                    if content_objects_loc:
                         obj = StringToClass[name](unique_id=next(self.id_counter), location=(x, y))
-                        self.add_object(obj)
-                        static_objects_loc[0].add_content(obj)
-                        break
+                        self.parse_object_state(obj, state)
+                        for content_obj in content_objects_loc:
+                            if content_obj.accepts(obj):
+                                self.add_object(obj)
+                                content_obj.add_content(obj)
+                                placed_current_obj = True
+                        if placed_current_obj:
+                            break
                     else:
                         time_out += 1
                         if time_out > 10000:
