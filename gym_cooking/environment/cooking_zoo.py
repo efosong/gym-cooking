@@ -328,47 +328,6 @@ class CookingEnvironment(AECEnv):
             done = True
         return done, rewards, open_goals
 
-    def get_simple_representation(self, agent):
-        # NB: only works when there's one of each object!
-        # cutting board location
-        cut_board_loc = self.world.world_objects["Cutboard"][0].location
-        # deliver square location
-        deliver_square_loc = self.world.world_objects["Deliversquare"][0].location
-        # plate location
-        plate_loc = self.world.world_objects["Plate"][0].location
-        # tomato location
-        tomato = self.world.world_objects["Tomato"][0]
-        if tomato.chop_state == ChopFoodStates.CHOPPED:
-            tomato_loc = (-1, -1)
-            chopped_tomato_loc =  tomato.location
-        else:
-            tomato_loc =  tomato.location
-            chopped_tomato_loc = (-1, -1)
-        # agent locations
-        ego_agent = self.world_agent_mapping[agent]
-        other_agents = [agent_obj
-                        for agent_id, agent_obj in self.world_agent_mapping.items()
-                        if agent_id != agent]
-        ego_agent_location = ego_agent.location
-        ego_agent_orientation = np.zeros(4)
-        ego_agent_orientation[ego_agent.orientation-1] = 1
-        other_agent_info = []
-        for other_agent in other_agents:
-            other_agent_location = other_agent.location
-            other_agent_orientation = np.zeros(4)
-            other_agent_orientation[other_agent.orientation-1] = 1
-            other_agent_info.extend((other_agent_location, other_agent_orientation))
-        return np.concatenate([
-            cut_board_loc,
-            deliver_square_loc,
-            plate_loc,
-            tomato_loc,
-            chopped_tomato_loc,
-            ego_agent_location,
-            ego_agent_orientation,
-            *other_agent_info
-            ])
-
     def get_feature_vector(self, agent):
         feature_vector = []
         objects = defaultdict(list)
