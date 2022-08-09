@@ -159,8 +159,13 @@ class Cutboard(StaticObject, ActionObject, ContentObject):
             return [], [], False
 
     def accepts(self, dynamic_object) -> bool:
-        return isinstance(dynamic_object, ChopFood) and len(self.content) < self.max_content and \
-                dynamic_object.chop_state == ChopFoodStates.FRESH
+        return (
+            isinstance(dynamic_object, ChopFood)
+            and len(self.content) < self.max_content
+            and dynamic_object.chop_state == ChopFoodStates.FRESH
+            and (not isinstance(dynamic_object, BlenderFood)
+                 or dynamic_object.blend_state == BlenderFoodStates.FRESH)
+            )
 
     def releases(self) -> bool:
         if len(self.content) == 1:
@@ -195,6 +200,87 @@ class Cutboard(StaticObject, ActionObject, ContentObject):
 
     def file_name(self) -> str:
         return "cutboard"
+
+    def icons(self) -> List[str]:
+        return []
+
+    def display_text(self) -> str:
+        return ""
+
+
+class Blender(StaticObject, ProcessingObject, ContentObject, ToggleObject, ActionObject):
+
+    def __init__(self, unique_id, location):
+        super().__init__(unique_id, location, False)
+        self.max_content = 1
+
+    def process(self):
+        assert len(self.content) <= self.max_content, "Too many Dynamic Objects placed into the Blender"
+
+        if self.content and self.toggle:
+
+            for con in self.content:
+                con.blend()
+
+            if all([cont.blend_state == BlenderFoodStates.MASHED for cont in self.content]):
+                self.switch_toggle()
+
+                self.status = ActionObjectState.NOT_USABLE
+
+                for cont in self.content:
+                    cont.current_progress = cont.min_progress
+
+    def accepts(self, dynamic_object) -> bool:
+        # disallow blending chopped food
+        # may want to change this in the future, would require modifying obj.done()
+        return (
+            isinstance(dynamic_object, BlenderFood)
+            and (not self.toggle)
+            and len(self.content) + 1 <= self.max_content
+            and dynamic_object.blend_state == BlenderFoodStates.FRESH
+            and ((not isinstance(dynamic_object, ChopFood))
+                 or dynamic_object.chop_state == ChopFoodStates.FRESH)
+            )
+
+    def releases(self) -> bool:
+        valid = not self.toggle
+        if valid:
+            # if last removed, not usable
+            if len(self.content) - 1 == 0:
+                self.status = ActionObjectState.NOT_USABLE
+        return valid
+
+    def add_content(self, content):
+        if self.accepts(content):
+            self.status = ActionObjectState.READY
+            self.content.append(content)
+            for c in self.content:
+                c.free = False
+            self.content[-1].free = True
+
+    def action(self) -> Tuple[List, List, bool]:
+        valid = self.status == ActionObjectState.READY
+        if valid:
+            self.switch_toggle()
+        return [], [], valid
+
+    def numeric_state_representation(self):
+        return 1,
+
+    def feature_vector_representation(self):
+        # Might wish to represent toggle state in the future
+        return self.location
+
+    @classmethod
+    def state_length(cls):
+        return 1
+
+    @classmethod
+    def feature_vector_length(cls):
+        return 2
+
+    def file_name(self) -> str:
+        return "blender_on" if self.toggle else "blender3"
 
     def icons(self) -> List[str]:
         return []
@@ -365,18 +451,21 @@ class Carrot(BlenderFood, ChopFood):
         return self.chop_state == ChopFoodStates.CHOPPED or self.blend_state == BlenderFoodStates.MASHED
 
     def numeric_state_representation(self):
-        return 1, int(self.chop_state == ChopFoodStates.CHOPPED)
+        return 1, int(self.chop_state == ChopFoodStates.CHOPPED), int(self.blend_state == BlenderFoodStates.MASHED)
 
     def feature_vector_representation(self):
-        return list(self.location) + [int(self.chop_state == ChopFoodStates.CHOPPED)]
+        return [*self.location,
+                int(self.chop_state == ChopFoodStates.CHOPPED),
+                int(self.blend_state == BlenderFoodStates.MASHED),
+                ]
 
     @classmethod
     def state_length(cls):
-        return 2
+        return 3
 
     @classmethod
     def feature_vector_length(cls):
-        return 3
+        return 4
 
     def file_name(self) -> str:
         if self.done():
@@ -435,18 +524,21 @@ class Banana(BlenderFood, ChopFood):
         return self.chop_state == ChopFoodStates.CHOPPED or self.blend_state == BlenderFoodStates.MASHED
 
     def numeric_state_representation(self):
-        return 1, int(self.chop_state == ChopFoodStates.CHOPPED)
+        return 1, int(self.chop_state == ChopFoodStates.CHOPPED), int(self.blend_state == BlenderFoodStates.MASHED)
 
     def feature_vector_representation(self):
-        return list(self.location) + [int(self.chop_state == ChopFoodStates.CHOPPED)]
+        return [*self.location,
+                int(self.chop_state == ChopFoodStates.CHOPPED),
+                int(self.blend_state == BlenderFoodStates.MASHED),
+                ]
 
     @classmethod
     def state_length(cls):
-        return 2
+        return 3
 
     @classmethod
     def feature_vector_length(cls):
-        return 3
+        return 4
 
     def file_name(self) -> str:
         return "default_dynamic"
@@ -467,18 +559,21 @@ class Apple(BlenderFood, ChopFood):
         return self.chop_state == ChopFoodStates.CHOPPED or self.blend_state == BlenderFoodStates.MASHED
 
     def numeric_state_representation(self):
-        return 1, int(self.chop_state == ChopFoodStates.CHOPPED)
+        return 1, int(self.chop_state == ChopFoodStates.CHOPPED), int(self.blend_state == BlenderFoodStates.MASHED)
 
     def feature_vector_representation(self):
-        return list(self.location) + [int(self.chop_state == ChopFoodStates.CHOPPED)]
+        return [*self.location,
+                int(self.chop_state == ChopFoodStates.CHOPPED),
+                int(self.blend_state == BlenderFoodStates.MASHED),
+                ]
 
     @classmethod
     def state_length(cls):
-        return 2
+        return 3
 
     @classmethod
     def feature_vector_length(cls):
-        return 3
+        return 4
 
     def file_name(self) -> str:
         return "default_dynamic"
@@ -573,6 +668,9 @@ class Agent(Object):
 
     def display_text(self) -> str:
         return ""
+
+
+
 
 
 GAME_CLASSES = [m[1] for m in inspect.getmembers(sys.modules[__name__], inspect.isclass) if m[1].__module__ == __name__]
