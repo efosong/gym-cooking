@@ -31,12 +31,14 @@ ChoppedBanana = RecipeNode(root_type=Banana, id_num=next(id_generator), name="Ba
                            conditions=[("chop_state", ChopFoodStates.CHOPPED)], objects_to_seek=[Banana, Cutboard])
 ChoppedCarrot = RecipeNode(root_type=Carrot, id_num=next(id_generator), name="Carrot",
                            conditions=[("chop_state", ChopFoodStates.CHOPPED)], objects_to_seek=[Carrot, Cutboard])
-# MashedCarrot = RecipeNode(root_type=Carrot, id_num=next(id_generator), name="Carrot",
-#                           conditions=[("blend_state", BlenderFoodStates.MASHED)])
+MashedCarrot = RecipeNode(root_type=Carrot, id_num=next(id_generator), name="Carrot",
+                          conditions=[("blend_state", BlenderFoodStates.MASHED)], objects_to_seek=[Carrot, Blender])
 
 # Salad Plates
 TomatoSaladPlate = RecipeNode(root_type=Plate, id_num=next(id_generator), name="Plate", conditions=None,
                               contains=[ChoppedTomato], objects_to_seek=[Tomato, Plate])
+CarrotMashPlate = RecipeNode(root_type=Plate, id_num=next(id_generator), name="Plate", conditions=None,
+                             contains=[MashedCarrot], objects_to_seek=[Carrot, Plate])
 TomatoLettucePlate = RecipeNode(root_type=Plate, id_num=next(id_generator), name="Plate", conditions=None,
                                 contains=[ChoppedTomato, ChoppedLettuce], objects_to_seek=[(Tomato, Lettuce), Plate,
                                                                                            (Tomato, Lettuce), Plate])
@@ -56,12 +58,16 @@ AppleWatermelonPlate = RecipeNode(root_type=Plate, id_num=next(id_generator), na
                                   contains=[ChoppedApple, ChoppedWatermelon],
                                   objects_to_seek=[(Apple, Watermelon), Plate,
                                                    (Apple, Watermelon), Plate])
-# CarrotPlate = RecipeNode(root_type=Plate, id_num=next(id_generator), name="Plate", conditions=None,
-#                          contains=[MashedCarrot])
+TomatoCarrotMashPlate = RecipeNode(root_type=Plate, id_num=next(id_generator), name="Plate", conditions=None,
+                                   contains=[ChoppedTomato, MashedCarrot],
+                                   objects_to_seek=[(Tomato, Carrot), Plate,
+                                                    (Tomato, Carrot), Plate])
 
 # Delivered Salads
 TomatoSalad = RecipeNode(root_type=Deliversquare, id_num=next(id_generator), name="Deliversquare", conditions=None,
                          contains=[TomatoSaladPlate], objects_to_seek=[Plate, Deliversquare])
+CarrotMash = RecipeNode(root_type=Deliversquare, id_num=next(id_generator), name="Deliversquare", conditions=None,
+                        contains=[CarrotMashPlate], objects_to_seek=[Plate, Deliversquare])
 TomatoLettuceSalad = RecipeNode(root_type=Deliversquare, id_num=next(id_generator), name="Deliversquare",
                                 conditions=None, contains=[TomatoLettucePlate]
                                 , objects_to_seek=[Plate, Deliversquare])
@@ -75,8 +81,8 @@ CucumberOnion = RecipeNode(root_type=Deliversquare, id_num=next(id_generator), n
                            contains=[CucumberOnionPlate], objects_to_seek=[Plate, Deliversquare])
 AppleWatermelon = RecipeNode(root_type=Deliversquare, id_num=next(id_generator), name="Deliversquare", conditions=None,
                              contains=[AppleWatermelonPlate], objects_to_seek=[Plate, Deliversquare])
-# MashedCarrot = RecipeNode(root_type=Deliversquare, id_num=next(id_generator), name="Deliversquare",
-#                           conditions=None, contains=[CarrotPlate])
+TomatoCarrotMash = RecipeNode(root_type=Deliversquare, id_num=next(id_generator), name="Deliversquare", conditions=None,
+                             contains=[TomatoCarrotMashPlate], objects_to_seek=[Plate, Deliversquare])
 
 floor = RecipeNode(root_type=Floor, id_num=next(id_generator), name="Floor", conditions=None, contains=[])
 no_recipe_node = RecipeNode(root_type=Deliversquare, id_num=next(id_generator), name='Deliversquare', conditions=None,
@@ -87,11 +93,12 @@ no_recipe_node = RecipeNode(root_type=Deliversquare, id_num=next(id_generator), 
 NUM_GOALS = next(id_generator)
 
 RECIPES = {"TomatoSalad": lambda: deepcopy(Recipe(TomatoSalad, NUM_GOALS)),
+           "CarrotMash": lambda: deepcopy(Recipe(CarrotMash, NUM_GOALS)),
            "TomatoLettuceSalad": lambda: deepcopy(Recipe(TomatoLettuceSalad, NUM_GOALS)),
            "CarrotBanana": lambda: deepcopy(Recipe(CarrotBanana, NUM_GOALS)),
            "CucumberOnion": lambda: deepcopy(Recipe(CucumberOnion, NUM_GOALS)),
            "AppleWatermelon": lambda: deepcopy(Recipe(AppleWatermelon, NUM_GOALS)),
            "TomatoLettuceOnionSalad": lambda: deepcopy(Recipe(TomatoLettuceOnionSalad, NUM_GOALS)),
-           # "MashedCarrot": lambda: deepcopy(Recipe(MashedCarrot)),
+           "TomatoCarrotMash": lambda: deepcopy(Recipe(TomatoCarrotMash, NUM_GOALS)),
            "no_recipe": lambda: deepcopy(Recipe(no_recipe_node, NUM_GOALS))
            }
