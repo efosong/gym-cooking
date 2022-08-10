@@ -7,11 +7,11 @@ num_humans = 1
 max_steps = 100
 render = False
 
-level = 'central_u_small'
+level = 'tomato_carrot_split_blocked'
 seed = 1
 record = False
 max_num_timesteps = 1000
-recipes = ["TomatoLettuceSalad", 'TomatoLettuceSalad']
+recipes = ["TomatoCarrotMash", 'TomatoCarrotMash']
 
 parallel_env = cooking_zoo.parallel_env(
     level=level,
