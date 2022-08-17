@@ -93,6 +93,7 @@ no_recipe_node = RecipeNode(root_type=Deliversquare, id_num=next(id_generator), 
 NUM_GOALS = next(id_generator)
 
 RECIPES = {"TomatoSalad": lambda: deepcopy(Recipe(TomatoSalad, NUM_GOALS)),
+           "TomatoSaladPlate": lambda: deepcopy(Recipe(TomatoSaladPlate, NUM_GOALS)),
            "CarrotMash": lambda: deepcopy(Recipe(CarrotMash, NUM_GOALS)),
            "TomatoLettuceSalad": lambda: deepcopy(Recipe(TomatoLettuceSalad, NUM_GOALS)),
            "CarrotBanana": lambda: deepcopy(Recipe(CarrotBanana, NUM_GOALS)),
