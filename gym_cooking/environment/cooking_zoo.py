@@ -344,6 +344,22 @@ class CookingEnvironment(AECEnv):
             done = True
         return done, rewards, open_goals
 
+    def feature_vector_semantics(self, ignore=[]):
+        objects = defaultdict(list)
+        objects.update(self.world.world_objects)
+        objects["Agent"] = self.world.agents
+        semantics = []
+        for cls in GAME_CLASSES:
+            if ClassToString[cls] in ignore:
+                continue
+            for obj in objects[ClassToString[cls]]:
+                features = list(obj.feature_vector_representation())
+                semantics.extend([ClassToString[cls]]*len(features))
+        for idx in range(self.ghost_agents):
+            features = self.world_agent_mapping[agent].feature_vector_representation()
+            semantics.extend(["GhostAgent"]*len(features))
+        return semantics
+
     def get_feature_vector(self, agent, ignore=[]):
         feature_vector = []
         objects = defaultdict(list)
