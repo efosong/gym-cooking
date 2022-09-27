@@ -22,19 +22,20 @@ class Game:
         SimplifiedCardinalScheme: KeyToTuple_human1
         }
 
-    def __init__(self, env, num_humans, ai_policies, max_steps=100, render=False):
+    def __init__(self, env, num_humans, ai_policies, render=False, record=False, exp_name="output", save_dir="misct/game/screenshots"):
         self._running = True
         self.env = env
         self.key_to_action = self.action_scheme_to_human_key_map[env.unwrapped.world.action_scheme]
         self.play = bool(num_humans)
         self.render = render or self.play
+        self.record = record
+        self.exp_name = exp_name
         # Visual parameters
         self.graphics_pipeline = graphic_pipeline.GraphicPipeline(env, self.render)
-        self.save_dir = 'misc/game/screenshots'
+        self.save_dir = save_dir
         self.store = defaultdict(list)
         self.num_humans = num_humans
         self.ai_policies = ai_policies
-        self.max_steps = max_steps
         self.current_step = 0
         self.last_obs = env.reset()
         self.step_done = False
@@ -164,6 +165,12 @@ class Game:
 
         while self._running:
             sleep(delay)
+            if self.record:
+                image_name = f"{self.exp_name}_{self.env.unwrapped.t:03}.png"
+                pygame.image.save(
+                    self.graphics_pipeline.screen,
+                    os.path.join(self.save_dir, image_name)
+                    )
             self.ai_only_event()
             self.on_render()
         self.on_cleanup()

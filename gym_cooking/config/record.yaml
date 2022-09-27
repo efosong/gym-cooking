@@ -1,0 +1,35 @@
+env:
+  n_agents: 2
+  level: tomato_carrot_split_tiny
+  max_steps: 250
+  recipes:
+    - TomatoCarrotMash
+    - TomatoCarrotMash
+  obs_spaces:
+    - feature_vector_nc
+
+seed: 1
+
+wandb_run: excited-seagull-123
+checkpoint: 60
+
+agents:
+  agent_1:
+    idx: 0
+    wandb_run: ${wandb_run}
+    checkpoint: ${checkpoint}
+    path: ${agents.agent_1.wandb_run}/model_${agents.agent_1.idx}_${agents.agent_1.checkpoint}.pt
+  agent_2:
+    idx: 0
+    wandb_run: ${wandb_run}
+    checkpoint: ${checkpoint}
+    path: ${agents.agent_2.wandb_run}/model_${agents.agent_2.idx}_${agents.agent_2.checkpoint}.pt
+
+viz:
+  render: false
+  record: true
+  fps: 2
+  video_save_name: output_${seed}.mp4
+
+
+
