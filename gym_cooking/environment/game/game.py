@@ -85,7 +85,9 @@ class Game:
 
                 self.yielding_action_dict = {agent: self.env.unwrapped.world_agent_mapping[agent].action
                                              for agent in self.env.agents}
-                observations, rewards, dones, infos = self.env.step(self.yielding_action_dict)
+                observations, rewards, terminations, truncations, infos = self.env.step(self.yielding_action_dict)
+                dones = {agent: terminations[agent] or truncations[agent]
+                         for agent in self.env.agents}
 
                 self.store["actions"].append(store_action_dict)
                 self.store["info"].append(infos)
@@ -120,7 +122,9 @@ class Game:
 
         # -1 used as stop_game action, agent can end the episode
         if not -1 in self.yielding_action_dict.values():
-            observations, rewards, dones, infos = self.env.step(self.yielding_action_dict)
+            observations, rewards, terminations, truncations, infos = self.env.step(self.yielding_action_dict)
+            dones = {agent: terminations[agent] or truncations[agent]
+                     for agent in self.env.agents}
 
             self.store["actions"].append(store_action_dict)
             self.store["info"].append(infos)

@@ -119,8 +119,6 @@ class CookingEnvironment(AECEnv):
         self.recipe_graphs = [RECIPES[recipe]() for recipe in recipes]
         self.ghost_agents = ghost_agents
 
-        self.terminated = False
-        self.truncated = False
         self.completion_reward_frac = completion_reward_frac
         self.time_penalty = time_penalty
         self.world.load_level(level=self.level, num_agents=num_agents)
@@ -220,10 +218,6 @@ class CookingEnvironment(AECEnv):
         self.seed(seed)
         self.t = 0
 
-        # For tracking data during an episode.
-        self.truncated = False
-        self.terminated = False
-
         # Load world & distances.
         self.world.load_level(level=self.level, num_agents=len(self.possible_agents))
 
@@ -245,8 +239,10 @@ class CookingEnvironment(AECEnv):
                                            for agent in self.agents}
         self.rewards = dict(zip(self.agents, [0 for _ in self.agents]))
         self._cumulative_rewards = dict(zip(self.agents, [0 for _ in self.agents]))
-        self.dones = dict(zip(self.agents, [False for _ in self.agents]))
-        self.infos = dict(zip(self.agents, [{} for _ in self.agents]))
+        self.terminations = {agent: False for agent in self.agents}
+        self.truncations = {agent: False for agent in self.agents}
+        self.dones = {agent: False for agent in self.agents}
+        self.infos = {agent: {} for agent in self.agents}
         self.accumulated_actions = []
 
     def close(self):
@@ -255,7 +251,7 @@ class CookingEnvironment(AECEnv):
     def step(self, action):
         agent = self.agent_selection
         if self.dones[agent]:
-            return self._was_done_step(action)
+            return self._was_dead_step(action)
         self.accumulated_actions.append(action)
         for idx, agent in enumerate(self.agents):
             self.rewards[agent] = 0
@@ -277,7 +273,7 @@ class CookingEnvironment(AECEnv):
             self.current_tensor_observation[agent] = self.get_tensor_representation(agent)
 
         done, rewards, goals = self.compute_rewards()
-        info = {"t": self.t, "terminated": self.terminated, "truncated": self.truncated}
+        info = {"t": self.t}
         for idx, agent in enumerate(self.agents):
             self.dones[agent] = done
             self.rewards[agent] = rewards[idx]
@@ -311,7 +307,8 @@ class CookingEnvironment(AECEnv):
         open_goals = [[0]] * len(self.recipes)
         # Done if the episode maxes out
         if self.t >= self.max_steps and self.max_steps:
-            self.truncated = True
+            for agent in self.agents:
+                self.truncations[agent] = True
             done = True
 
         for idx, recipe in enumerate(self.recipe_graphs):
@@ -340,7 +337,8 @@ class CookingEnvironment(AECEnv):
         #         rewards[idx] -= 0.01
 
         if all((recipe.completed() for recipe in self.recipe_graphs)):
-            self.terminated = True
+            for agent in self.agents:
+                self.terminations[agent] = True
             done = True
         return done, rewards, open_goals
 
