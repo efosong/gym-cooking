@@ -31,6 +31,7 @@ def env(
         ghost_agents=0,
         completion_reward_frac=0.2,
         time_penalty=0.0,
+        ego_first=True,
     ):
     """
     The env function wraps the environment in 3 wrappers by default. These
@@ -50,6 +51,7 @@ def env(
         ghost_agents=ghost_agents,
         completion_reward_frac=completion_reward_frac,
         time_penalty=time_penalty,
+        ego_first=ego_first,
         )
     env_init = wrappers.AssertOutOfBoundsWrapper(env_init)
     env_init = wrappers.OrderEnforcingWrapper(env_init)
@@ -84,6 +86,7 @@ class CookingEnvironment(AECEnv):
             ghost_agents=0,
             completion_reward_frac=0.2,
             time_penalty=0.0,
+            ego_first=True,
         ):
 
         super().__init__()
@@ -103,6 +106,7 @@ class CookingEnvironment(AECEnv):
             f"Please select an observation space from: {self.allowed_obs_spaces}"
         self.obs_spaces = obs_spaces
         self.allowed_objects = allowed_objects or []
+        self.ego_first = ego_first
         self.possible_agents = [f"player_{r}" for r in range(num_agents)]
         self.agents = self.possible_agents[:]
 
@@ -342,11 +346,31 @@ class CookingEnvironment(AECEnv):
             done = True
         return done, rewards, open_goals
 
-    def feature_vector_semantics(self, ignore=[]):
+    def feature_vector_semantics(self, agent="player_0", ignore=[]):
         objects = defaultdict(list)
         objects.update(self.world.world_objects)
-        objects["Agent"] = self.world.agents
         semantics = []
+        if self.ego_first:
+            # Ego first...
+            features = list(self.world_agent_mapping[agent].feature_vector_representation())
+            semantics.extend(["EgoAgent"]*len(features))
+            # Then the rest
+            for world_agent in self.world.agents:
+                if world_agent is self.world_agent_mapping[agent]:
+                    continue
+                else:
+                    string = "Agent"
+                    features = list(world_agent.feature_vector_representation())
+                    semantics.extend([string]*len(features))
+        else:
+            for world_agent in self.world.agents:
+                features = list(world_agent.feature_vector_representation())
+                if world_agent is self.world_agent_mapping[agent]:
+                    string = "EgoAgent"
+                else:
+                    string = "Agent"
+                semantics.extend([string]*len(features))
+
         for cls in GAME_CLASSES:
             if ClassToString[cls] in ignore:
                 continue
@@ -362,8 +386,36 @@ class CookingEnvironment(AECEnv):
         feature_vector = []
         objects = defaultdict(list)
         objects.update(self.world.world_objects)
-        objects["Agent"] = self.world.agents
         x, y = self.world_agent_mapping[agent].location
+        # do agents first:
+        if self.ego_first:
+            # Ego first...
+            features = list(self.world_agent_mapping[agent].feature_vector_representation())
+            features[0] = features[0] / self.world.width
+            features[1] = features[1] / self.world.height
+            feature_vector.extend(features)
+            # Then the rest
+            for world_agent in self.world.agents:
+                if world_agent is self.world_agent_mapping[agent]:
+                    continue
+                else:
+                    features = list(world_agent.feature_vector_representation())
+                    features[0] = (features[0] - x) / self.world.width
+                    features[1] = (features[1] - y) / self.world.height
+                feature_vector.extend(features)
+        else:
+            for world_agent in self.world.agents:
+                if world_agent is self.world_agent_mapping[agent]:
+                    features = list(world_agent.feature_vector_representation())
+                    features[0] = features[0] / self.world.width
+                    features[1] = features[1] / self.world.height
+                else:
+                    features = list(world_agent.feature_vector_representation())
+                    features[0] = (features[0] - x) / self.world.width
+                    features[1] = (features[1] - y) / self.world.height
+                feature_vector.extend(features)
+
+
         for cls in GAME_CLASSES:
             if ClassToString[cls] in ignore:
                 continue
