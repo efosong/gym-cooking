@@ -1,2 +1,2 @@
-from gym_cooking.environment.environment import GymCookingEnvironment
+from gym_cooking.environment.environment import GymCookingEnvironment, EPyMARLGymCooking
 from gym_cooking.environment.cooking_zoo import CookingEnvironment as CookingZooEnvironment
