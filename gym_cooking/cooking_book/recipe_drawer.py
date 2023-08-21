@@ -95,6 +95,7 @@ NUM_GOALS = next(id_generator)
 RECIPES = {"TomatoSalad": lambda: deepcopy(Recipe(TomatoSalad, NUM_GOALS)),
            "TomatoSaladPlate": lambda: deepcopy(Recipe(TomatoSaladPlate, NUM_GOALS)),
            "CarrotMash": lambda: deepcopy(Recipe(CarrotMash, NUM_GOALS)),
+           "CarrotMashPlate": lambda: deepcopy(Recipe(CarrotMashPlate, NUM_GOALS)),
            "TomatoLettuceSalad": lambda: deepcopy(Recipe(TomatoLettuceSalad, NUM_GOALS)),
            "CarrotBanana": lambda: deepcopy(Recipe(CarrotBanana, NUM_GOALS)),
            "CucumberOnion": lambda: deepcopy(Recipe(CucumberOnion, NUM_GOALS)),
