@@ -9,8 +9,8 @@
                       {"Carrot": {"COUNT": 1, "X_POSITION": [0], "Y_POSITION":  [4,5]}}
   ],
   "AGENTS": [{"MAX_COUNT": 1, "X_POSITION": [2], "Y_POSITION":  [2]},
-	  		 {"MAX_COUNT": 1, "X_POSITION": [2], "Y_POSITION":  [4]},
 	  		 {"MAX_COUNT": 1, "X_POSITION": [4], "Y_POSITION":  [2]},
+	  		 {"MAX_COUNT": 1, "X_POSITION": [2], "Y_POSITION":  [4]},
 	  		 {"MAX_COUNT": 1, "X_POSITION": [4], "Y_POSITION":  [4]}
   ]
 }
