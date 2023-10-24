@@ -17,8 +17,23 @@ from pettingzoo.utils.conversions import parallel_wrapper_fn
 from gym.spaces import Discrete, Box, MultiBinary, Dict
 from gym.utils import colorize
 
+
 COLORS = ['blue', 'magenta', 'yellow', 'green']
 
+# from fst.agents.doe_classifier import OvercookedClassifier, MLPClassifier
+# #classifier = OvercookedClassifier(["player_0", "player_1"])
+# classifier = MLPClassifier.load_mlp(
+#         ["player_0", "player_1", "player_2", "player_3"],
+#         "/home/elliot/research/projects/envs/gym-cooking/gym_cooking/jay-hinton_yuette-frusher.pt"
+#         )
+# id_map = {
+#         "player_0": "NW",
+#         "player_1": "NE",
+#         "player_2": "SW",
+#         "player_3": "SE",
+#         }
+# for k,v in id_map.items():
+#     classifier.mlps[k] = classifier.mlps[v]
 
 def env(
         level,
@@ -53,7 +68,8 @@ def env(
         time_penalty=time_penalty,
         ego_first=ego_first,
         )
-    env_init = wrappers.AssertOutOfBoundsWrapper(env_init)
+    #import pdb; pdb.set_trace()
+    #env_init = wrappers.AssertOutOfBoundsWrapper(env_init)
     env_init = wrappers.OrderEnforcingWrapper(env_init)
     return env_init
 
@@ -303,6 +319,8 @@ class CookingEnvironment(AECEnv):
         if "feature_vector_nc" in self.obs_spaces:
             observation.append(self.get_feature_vector(agent, ignore=["Counter"]))
         returned_observation = observation if not len(observation) == 1 else observation[0]
+        #print(f"{id_map[agent]}: {classifier.is_doe(returned_observation, agent_id=agent).item()}")
+
         return returned_observation
 
     def compute_rewards(self):

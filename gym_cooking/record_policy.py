@@ -5,7 +5,7 @@ import torch
 import numpy as np
 import tempfile
 from subprocess import DEVNULL, STDOUT, check_call
-from d_network import AgentNetworkFC
+from d_network import AgentNetworkFC, fc_network
 import hydra
 
 class RandomAgent:
@@ -20,17 +20,23 @@ class DeepAgent:
 
     def __init__(self, model_path):
         model = torch.load(model_path)
-        self.joint_policy = AgentNetworkFC(
-            obs_dim = model["linear_obs_rep.0.weight"].shape[1],
-            obs_u_dim = 0,
-            mid_dim1 = model["linear_obs_rep.2.weight"].shape[0],
-            mid_dim2 = model["linear_obs_rep.2.weight"].shape[1],
-            gnn_hdim1 = model["gnn.2.weight"].shape[0],
-            gnn_hdim2 = model["gnn.2.weight"].shape[1],
-            gnn_out_dim = model["gnn.4.weight"].shape[0],
-            num_acts = model["act_logits.weight"].shape[0],
-            device="cpu",
-        )
+        keys = [key for key in list(model)
+                if key[-6:] == "weight"]
+        net_size = [model[key].shape[-1]
+                for key in keys]
+        net_size = net_size + [model[keys[-1]].shape[0]]
+        self.joint_policy = fc_network(net_size)
+        #self.joint_policy = AgentNetworkFC(
+        #    obs_dim = model["linear_obs_rep.0.weight"].shape[1],
+        #    obs_u_dim = 0,
+        #    mid_dim1 = model["linear_obs_rep.2.weight"].shape[0],
+        #    mid_dim2 = model["linear_obs_rep.2.weight"].shape[1],
+        #    gnn_hdim1 = model["gnn.2.weight"].shape[0],
+        #    gnn_hdim2 = model["gnn.2.weight"].shape[1],
+        #    gnn_out_dim = model["gnn.4.weight"].shape[0],
+        #    num_acts = model["act_logits.weight"].shape[0],
+        #    device="cpu",
+        #)
         self.joint_policy.load_state_dict(model)
 
     def get_action(self, observation):
