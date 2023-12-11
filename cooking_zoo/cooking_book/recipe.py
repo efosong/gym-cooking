@@ -16,7 +16,7 @@ class RecipeNode:
         self.marked = False
         self.id_num = id_num
         self.root_type = root_type
-        self.conditions = conditions or []
+        self.conditions = conditions or (lambda world_object: True)
         self.contains = contains or []
         self.world_objects = []
         self.name = name
@@ -94,6 +94,13 @@ class Recipe:
 
     @staticmethod
     def check_conditions(node: RecipeNode, world_object):
+        return (
+            node.conditions(world_object)
+            and all(
+                any(obj.location == world_object.location for obj in contained_node.world_objects)
+                for contained_node in node.contains
+            )
+        )
         for condition in node.conditions:
             if getattr(world_object, condition[0]) != condition[1]:
                 return False
@@ -102,3 +109,15 @@ class Recipe:
             for contains in node.contains:
                 all_contained.append(any([obj.location == world_object.location for obj in contains.world_objects]))
             return all(all_contained)
+
+
+def attr_condition(attr_name, attr_val):
+    return lambda world_object: getattr(world_object, attr_name) == attr_val
+
+def all_condition(*conditions):
+    """Returns a condition which is the conjunction of all input conditions."""
+    return lambda world_object: all(condition(world_object) for condition in conditions)
+
+def any_condition(*conditions):
+    """Returns a condition which is the disjunction of all input conditions."""
+    return lambda world_object: any(condition(world_object) for condition in conditions)
