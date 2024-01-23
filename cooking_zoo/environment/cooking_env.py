@@ -187,6 +187,7 @@ class CookingEnvironment(AECEnv):
         
         # Load world & distances.
         if options["full_reset"]:
+            self.graphic_pipeline = None
             self.world = CookingWorld(self.action_scheme_class,
                                       agent_respawn_rate=self.agent_respawn_rate, grace_period=self.grace_period,
                                       agent_despawn_rate=self.agent_despawn_rate)
