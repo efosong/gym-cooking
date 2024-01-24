@@ -202,6 +202,8 @@ class CookingEnvironment(ParallelEnv):
 
         observations = {agent: self.observe(agent) for agent in self.agents}
         rewards, terminations, truncations, infos = self.compute_rewards()
+        self.agents = [agent for agent in self.agents
+                       if not (terminations[agent] or truncations[agent])]
         return observations, rewards, terminations, truncations, infos
 
     def observe(self, agent):
@@ -263,13 +265,7 @@ class CookingEnvironment(ParallelEnv):
                     "task": None,
             }
 
-        # TODO truncations
-        if self.t >= self.max_steps:
-            truncations = {agent: True for agent in self.agents}
-            self.world.active_agents = [False] * self.num_agents # TODO
-        else:
-            truncations = {agent: False for agent in self.agents}
-
+        truncations = {agent: self.t >= self.max_steps for agent in self.agents}
         return  rewards,terminations, truncations, infos
 
     def get_feature_vector(self, agent):
