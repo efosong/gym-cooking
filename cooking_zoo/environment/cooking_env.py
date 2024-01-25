@@ -132,7 +132,6 @@ class CookingEnvironment(ParallelEnv):
         self.current_tensor_observation = np.zeros((self.world.width, self.world.height,
                                                     self.graph_representation_length))
         self.render_mode = render_mode
-        self.np_random = None
         self.loaded_recipes = []
         if not RECIPE_STORE:
             self.loaded_recipes = list(RECIPES.keys())
@@ -156,9 +155,11 @@ class CookingEnvironment(ParallelEnv):
         return self.action_spaces[agent]
 
     def seed(self, seed=None):
-        self.np_random, seed = seeding.np_random(seed)
+        if seed is not None:
+            self.rng = np.random.default_rng(seed)
 
     def reset(self, seed=None, return_info=False, options=None):
+        self.seed(seed)
         options = options or {"full_reset": True}
         # self.world = CookingWorld(self.action_scheme_class)
         self.t = 0
