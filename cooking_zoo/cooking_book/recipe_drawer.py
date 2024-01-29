@@ -84,6 +84,10 @@ CucumberOnionPlate = RecipeNode(root_type=Plate, id_num=get_next_default_id(), n
 
 AppleWatermelonPlate = RecipeNode(root_type=Plate, id_num=get_next_default_id(), name="Plate", conditions=None,
                                   contains=[ChoppedApple, ChoppedWatermelon])
+ChoppedCarrotPlate = RecipeNode(root_type=Plate, id_num=get_next_default_id(), name="Plate", conditions=None,
+                                contains=[ChoppedCarrot])
+MashedCarrotPlate = RecipeNode(root_type=Plate, id_num=get_next_default_id(), name="Plate", conditions=None,
+                               contains=[MashedCarrot])
 ChoppedOrMashedCarrotPlate = RecipeNode(root_type=Plate, id_num=get_next_default_id(), name="Plate", conditions=None,
                                   contains=[ChoppedOrMashedCarrot])
 
@@ -105,6 +109,10 @@ CucumberOnion = RecipeNode(root_type=Deliversquare, id_num=get_next_default_id()
                            contains=[CucumberOnionPlate])
 AppleWatermelon = RecipeNode(root_type=Deliversquare, id_num=get_next_default_id(), name="Deliversquare", conditions=None,
                              contains=[AppleWatermelonPlate])
+ChoppedCarrotSalad = RecipeNode(root_type=Deliversquare, id_num=get_next_default_id(), name="Deliversquare",
+                               conditions=None, contains=[ChoppedCarrotPlate])
+MashedCarrotSalad = RecipeNode(root_type=Deliversquare, id_num=get_next_default_id(), name="Deliversquare",
+                               conditions=None, contains=[MashedCarrotPlate])
 CarrotSalad = RecipeNode(root_type=Deliversquare, id_num=get_next_default_id(), name="Deliversquare",
                           conditions=None, contains=[ChoppedOrMashedCarrotPlate])
 
@@ -120,6 +128,10 @@ RECIPES = {"TomatoSalad": lambda: deepcopy(Recipe(TomatoSalad, DEFAULT_NUM_GOALS
            "CucumberOnion": lambda: deepcopy(Recipe(CucumberOnion, DEFAULT_NUM_GOALS)),
            "AppleWatermelon": lambda: deepcopy(Recipe(AppleWatermelon, DEFAULT_NUM_GOALS)),
            "TomatoLettuceOnionSalad": lambda: deepcopy(Recipe(TomatoLettuceOnionSalad, DEFAULT_NUM_GOALS)),
+           "ChoppedCarrotPlate": lambda: deepcopy(Recipe(ChoppedCarrotPlate, DEFAULT_NUM_GOALS)),
+           "MashedCarrotPlate": lambda: deepcopy(Recipe(MashedCarrotPlate, DEFAULT_NUM_GOALS)),
+           "ChoppedCarrotSalad": lambda: deepcopy(Recipe(ChoppedCarrotSalad, DEFAULT_NUM_GOALS)),
+           "MashedCarrotSalad": lambda: deepcopy(Recipe(MashedCarrotSalad, DEFAULT_NUM_GOALS)),
            "CarrotSalad": lambda: deepcopy(Recipe(CarrotSalad, DEFAULT_NUM_GOALS)),
            "no_recipe": lambda: deepcopy(Recipe(no_recipe_node, DEFAULT_NUM_GOALS))
            }
